@@ -938,8 +938,8 @@
   // EXPORT HTML
   exportBtn.addEventListener('click', function() {
     if (slides.length === 0) { alert('No slides to export.'); return; }
-    syncFromIframe();
-    var slideData = slides.map(function(s) { return { html: s.html, bg: s.bg || '#ffffff' }; });
+    syncFromIframe(); // save current slide edits
+    var slideData = slides.map(function(s) { return { html: s.html || '', bg: s.bg || '#ffffff' }; });
     var exported = buildExportedHTML(slideData);
     downloadFile('presentation.html', exported);
   });
@@ -986,7 +986,7 @@
 '    function resize() {\n' +
 '      var availW = window.innerWidth - 20;\n' +
 '      var availH = window.innerHeight - 100;\n' +
-'      var scale = Math.min(availW / SLIDE_W, availH / SLIDE_H, 1);\n' +
+'      var scale = Math.min(availW / SLIDE_W, availH / SLIDE_H);\n' +
 '      var w = Math.round(SLIDE_W * scale);\n' +
 '      var h = Math.round(SLIDE_H * scale);\n' +
 '      var iframe = document.getElementById("slide-display");\n' +
