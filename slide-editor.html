@@ -690,24 +690,34 @@
         '}' +
 
         // CLICK: select on first click, edit on second click (if already selected)
+        // Walk up from clicked element to a direct child of body (the "block" to select)
+        'function topLevelEl(t){' +
+          'if(!t||t===document.body||t===document.documentElement)return null;' +
+          'var el=t;' +
+          'while(el.parentNode&&el.parentNode!==document.body){el=el.parentNode;}' +
+          'if(el===document.body||el===document.documentElement)return null;' +
+          'return el;' +
+        '}' +
+
         'document.addEventListener("mousedown",function(e){' +
           'var t=e.target;' +
-          'if(t===overlay||overlay&&overlay.contains(t))return;' + // handled by overlay
+          // ignore overlay handles (they have their own handlers)
+          'if(overlay&&overlay.contains(t))return;' +
           'if(t===document.body||t===document.documentElement){deselect();return;}' +
-          'if(editing&&sel&&(t===sel||sel.contains(t)))return;' + // inside active edit
-          'if(sel===t){' +
-            // second click on same element = enter edit if text
-            'if(!editing){' +
-              'var textTags=["P","H1","H2","H3","H4","H5","H6","SPAN","A","LI","TD","TH","LABEL","FIGCAPTION","STRONG","EM","B","I","U","DIV"];' +
-              'if(textTags.indexOf(t.tagName)>-1){enterEdit(t,e.clientX,e.clientY);}' +
-            '}' +
-            'dragEl=t;dragOX=e.clientX;dragOY=e.clientY;dragging=false;' +
+          // if currently editing and click is inside the edited element, let it through for cursor positioning
+          'if(editing&&sel&&(t===sel||sel.contains(t)))return;' +
+          // if click is inside currently selected element → enter edit mode
+          'if(sel&&(t===sel||sel.contains(t))){' +
+            'if(!editing){enterEdit(sel,e.clientX,e.clientY);}' +
+            'dragEl=sel;dragOX=e.clientX;dragOY=e.clientY;dragging=false;' +
             'e.preventDefault();return;' +
           '}' +
-          // first click — select
+          // click on new element — select the top-level block
           'if(editing){exitEdit();}' +
-          'selectEl(t);' +
-          'dragEl=t;dragOX=e.clientX;dragOY=e.clientY;dragging=false;' +
+          'var block=topLevelEl(t);' +
+          'if(!block){deselect();return;}' +
+          'selectEl(block);' +
+          'dragEl=block;dragOX=e.clientX;dragOY=e.clientY;dragging=false;' +
           'e.preventDefault();' +
         '});' +
 
