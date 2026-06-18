@@ -528,67 +528,28 @@
     slideCounter.style.display = '';
   }
 
-  // SYNC HTML FROM IFRAME — saves edits back into originalHTML
+  // SYNC HTML FROM IFRAME
   function syncFromIframe() {
-    if (!originalBlobUrl || currentIndex < 0) return;
+    if (currentIndex < 0) return;
     try {
       var iDoc = previewIframe.contentDocument;
       if (!iDoc) return;
-      // Remove edit decorations
       iDoc.querySelectorAll('[contenteditable]').forEach(function(el) {
         el.removeAttribute('contenteditable');
         el.style.outline = '';
+        el.style.cursor = '';
       });
-      // Capture the edited section HTML and update originalHTML
-      var sections = iDoc.querySelectorAll('section');
-      if (sections.length > currentIndex) {
-        var sec = sections[currentIndex];
-        slides[currentIndex].savedHTML = sec.outerHTML;
-      }
+      iDoc.querySelectorAll('img').forEach(function(im) { im.style.outline = ''; });
+      slides[currentIndex].html = iDoc.body.innerHTML;
     } catch(e) {}
   }
 
   // RENDER PREVIEW
   function renderPreview() {
-    if (currentIndex < 0) return;
-
-    if (originalBlobUrl) {
-      // Load the original HTML via blob URL so its JS/CSS/fonts all work
-      previewIframe.src = originalBlobUrl;
-      previewIframe.onload = function() {
-        try {
-          var iWin = previewIframe.contentWindow;
-          // Inject script to jump to the right slide and enable editing
-          var script = iWin.document.createElement('script');
-          script.textContent = '(function(){' +
-            'var idx = ' + currentIndex + ';' +
-            'var sections = document.querySelectorAll("section");' +
-            'if(sections.length > 0){' +
-              'sections.forEach(function(s,i){ s.style.display = i===idx ? "" : "none"; });' +
-            '}' +
-            // Make text editable on click
-            'document.addEventListener("click",function(e){' +
-              'var tags=["P","H1","H2","H3","H4","H5","H6","SPAN","DIV","STRONG","EM","B","I","LI","TD","TH"];' +
-              'if(tags.indexOf(e.target.tagName)>-1){' +
-                'e.target.contentEditable="true";' +
-                'e.target.style.outline="2px solid #FF6B35";' +
-                'e.target.focus();' +
-                'var fs=parseInt(window.getComputedStyle(e.target).fontSize)||16;' +
-                'function rgbToHex(rgb){var m=rgb.match(/rgb\\((\\d+),\\s*(\\d+),\\s*(\\d+)\\)/);if(!m)return"#000000";return"#"+[m[1],m[2],m[3]].map(function(x){return parseInt(x).toString(16).padStart(2,"0");}).join("");}' +
-                'var col=rgbToHex(window.getComputedStyle(e.target).color);' +
-                'window.parent.postMessage({type:"select-text",fontSize:fs,color:col,tag:e.target.tagName},"*");' +
-              '}' +
-            '});' +
-            'document.addEventListener("input",function(){window.parent.postMessage({type:"content-changed"},"*");});' +
-          '})();';
-          iWin.document.body.appendChild(script);
-        } catch(ex) {}
-      };
-    } else if (slides[currentIndex]) {
-      var slide = slides[currentIndex];
-      previewIframe.removeAttribute('src');
-      previewIframe.srcdoc = buildSlideDoc(slide.html || '', slide.bg || '#fff', true, slide.bodyStyle, slide.headExtra);
-    }
+    if (currentIndex < 0 || currentIndex >= slides.length) return;
+    var slide = slides[currentIndex];
+    previewIframe.removeAttribute('src');
+    previewIframe.srcdoc = buildSlideDoc(slide.html || '', slide.bg || '#ffffff', true, slide.bodyStyle || '', slide.headExtra || '');
   }
 
   function buildSlideDoc(html, bg, interactive, bodyStyle, headExtra) {
@@ -796,31 +757,43 @@
     slidesList.innerHTML = '';
     for (var idx = 0; idx < slides.length; idx++) {
       (function(i) {
+        var slide = slides[i];
         var thumb = document.createElement('div');
         thumb.className = 'slide-thumb' + (i === currentIndex ? ' active' : '');
         thumb.dataset.idx = i;
+        thumb.draggable = true;
 
-        // Use a scaled iframe for the thumbnail if we have the original HTML
-        if (originalBlobUrl) {
-          var thumbFrame = document.createElement('iframe');
-          thumbFrame.style.cssText = 'width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;border:none;pointer-events:none;transform-origin:top left;transform:scale(0.155);';
-          thumbFrame.src = originalBlobUrl;
-          thumbFrame.onload = function() {
-            try {
-              var sections = thumbFrame.contentDocument.querySelectorAll('section');
-              sections.forEach(function(s, si) { s.style.display = si === i ? '' : 'none'; });
-            } catch(ex) {}
-          };
-          thumb.appendChild(thumbFrame);
-          thumb.style.cssText = 'overflow:hidden;width:' + Math.round(SLIDE_W*0.155) + 'px;height:' + Math.round(SLIDE_H*0.155) + 'px;';
-        }
+        var inner = document.createElement('div');
+        inner.className = 'thumb-inner';
+
+        var frame = document.createElement('div');
+        frame.className = 'thumb-frame';
+        frame.style.cssText = (slide.bodyStyle || '') + ';width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;transform-origin:top left;transform:scale(0.155);overflow:hidden;';
+        frame.innerHTML = slide.html || '';
+
+        inner.appendChild(frame);
 
         var idxLabel = document.createElement('div');
         idxLabel.className = 'thumb-index';
         idxLabel.textContent = i + 1;
+
+        var delBtn = document.createElement('button');
+        delBtn.className = 'thumb-delete';
+        delBtn.innerHTML = '&times;';
+        delBtn.title = 'Delete slide';
+        delBtn.addEventListener('click', function(e) { e.stopPropagation(); deleteSlide(i); });
+
+        thumb.appendChild(inner);
         thumb.appendChild(idxLabel);
+        thumb.appendChild(delBtn);
 
         thumb.addEventListener('click', function() { selectSlide(i); });
+        thumb.addEventListener('dragstart', onDragStart);
+        thumb.addEventListener('dragover',  onDragOver);
+        thumb.addEventListener('dragleave', onDragLeave);
+        thumb.addEventListener('drop',      onDrop);
+        thumb.addEventListener('dragend',   onDragEnd);
+
         slidesList.appendChild(thumb);
       })(idx);
     }
@@ -832,7 +805,16 @@
     }
   }
 
-  function refreshThumb(idx) { /* thumbnails are live iframes, no refresh needed */ }
+  function refreshThumb(idx) {
+    if (idx < 0 || idx >= slides.length) return;
+    var thumbs = slidesList.querySelectorAll('.slide-thumb');
+    if (!thumbs[idx]) return;
+    var frame = thumbs[idx].querySelector('.thumb-frame');
+    if (frame) {
+      frame.innerHTML = slides[idx].html || '';
+      frame.style.cssText = (slides[idx].bodyStyle || '') + ';width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;transform-origin:top left;transform:scale(0.155);overflow:hidden;';
+    }
+  }
 
   // DELETE SLIDE
   function deleteSlide(idx) {
@@ -895,10 +877,6 @@
   }
 
   // IMPORT HTML
-  var originalHTML = null;
-  var slideCount = 0;
-  var originalBlobUrl = null;
-
   importBtn.addEventListener('click', function() {
     importFile.value = '';
     importFile.click();
@@ -908,89 +886,48 @@
     var file = importFile.files[0];
     if (!file) return;
     var reader = new FileReader();
-    reader.onload = function(e) { loadOriginalHTML(e.target.result); };
+    reader.onload = function(e) { parseImportedHTML(e.target.result); };
     reader.readAsText(file);
   });
-
-  function loadOriginalHTML(html) {
-    originalHTML = html;
-
-    // Count sections
-    var sectionMatches = html.match(/<section\b/g);
-    slideCount = sectionMatches ? sectionMatches.length : 0;
-
-    // Try inside bundled template too
-    if (slideCount === 0) {
-      var bundleMatch = html.match(/<script[^>]+type="__bundler\/template"[^>]*>([\s\S]*?)<\/script>/);
-      if (bundleMatch) {
-        try {
-          var inner = JSON.parse(bundleMatch[1].trim());
-          var innerSections = inner.match(/<section\b/g);
-          slideCount = innerSections ? innerSections.length : 1;
-        } catch(e) { slideCount = 1; }
-      } else {
-        slideCount = 1;
-      }
-    }
-
-    // Build fake slides array for sidebar (just indices, rendering done via iframe)
-    slides = [];
-    for (var i = 0; i < slideCount; i++) {
-      slides.push({ index: i });
-    }
-
-    // Create blob URL so iframe can load it with full JS/CSS
-    if (originalBlobUrl) URL.revokeObjectURL(originalBlobUrl);
-    var blob = new Blob([html], { type: 'text/html' });
-    originalBlobUrl = URL.createObjectURL(blob);
-
-    renderSidebar();
-    selectSlide(0);
-  }
 
   function parseImportedHTML(html) {
     var newSlides = [];
 
-    // Handle slides-grab bundled format: sections are inside a JSON-encoded script tag
+    // Handle slides-grab bundled format
     var bundleMatch = html.match(/<script[^>]+type="__bundler\/template"[^>]*>([\s\S]*?)<\/script>/);
     if (bundleMatch) {
       try {
         var inner = JSON.parse(bundleMatch[1].trim());
 
-        // Build image map from manifest (UUID -> data URI)
-        var imgMap = {};
+        // Build full resource map (images + fonts) from manifest
         var manifestMatch = html.match(/<script[^>]+type="__bundler\/manifest"[^>]*>([\s\S]*?)<\/script>/);
         if (manifestMatch) {
           try {
             var manifest = JSON.parse(manifestMatch[1].trim());
             Object.keys(manifest).forEach(function(uuid) {
               var entry = manifest[uuid];
-              if (entry.mime && entry.mime.startsWith('image') && entry.data) {
-                imgMap[uuid] = 'data:' + entry.mime + ';base64,' + entry.data;
+              if (entry.mime && entry.data) {
+                var dataUri = 'data:' + entry.mime + ';base64,' + entry.data;
+                // Replace all occurrences of this UUID in the template
+                inner = inner.split('"' + uuid + '"').join('"' + dataUri + '"');
+                inner = inner.split("'" + uuid + "'").join("'" + dataUri + "'");
               }
             });
           } catch(e2) {}
         }
 
-        // Replace UUID src references with data URIs
-        Object.keys(imgMap).forEach(function(uuid) {
-          inner = inner.split('src="' + uuid + '"').join('src="' + imgMap[uuid] + '"');
-          inner = inner.split("src='" + uuid + "'").join("src='" + imgMap[uuid] + "'");
-          inner = inner.split('url("' + uuid + '")').join('url("' + imgMap[uuid] + '")');
-        });
-
-        // Also extract helmet styles (fonts etc) from x-dc
+        // Extract helmet (fonts, global styles)
         var helmetStyles = '';
         var helmetMatch = inner.match(/<helmet>([\s\S]*?)<\/helmet>/);
         if (helmetMatch) helmetStyles = helmetMatch[1];
 
+        // Parse and extract sections
         var parser2 = new DOMParser();
         var innerDoc = parser2.parseFromString(inner, 'text/html');
         var bundleSections = Array.from(innerDoc.querySelectorAll('section'));
         if (bundleSections.length > 0) {
           bundleSections.forEach(function(sec) {
             var bg = sec.style.backgroundColor || sec.style.background || '#ffffff';
-            // Store innerHTML + section's own style so body can adopt it
             var secStyle = sec.getAttribute('style') || '';
             newSlides.push({
               html: sec.innerHTML,
@@ -1000,26 +937,23 @@
             });
           });
         }
-      } catch(e) {}
+      } catch(e) { console.error('Bundle parse error', e); }
     }
 
-    // Standard formats
+    // Standard HTML formats
     if (newSlides.length === 0) {
       var parser = new DOMParser();
       var doc = parser.parseFromString(html, 'text/html');
       var sections = Array.from(doc.querySelectorAll('section'));
       if (sections.length === 0) sections = Array.from(doc.querySelectorAll('div.slide'));
-      if (sections.length === 0) sections = Array.from(doc.querySelectorAll('article'));
-
       if (sections.length > 0) {
         sections.forEach(function(sec) {
           var bg = sec.style.backgroundColor || sec.style.background || '#ffffff';
-          newSlides.push({ html: sec.outerHTML, bg: extractColor(bg) || '#ffffff' });
+          var secStyle = sec.getAttribute('style') || '';
+          newSlides.push({ html: sec.innerHTML, bg: extractColor(bg) || '#ffffff', bodyStyle: secStyle, headExtra: '' });
         });
       } else {
-        var bodyHTML = doc.body ? doc.body.innerHTML : html;
-        var bodyBg = doc.body ? (doc.body.style.backgroundColor || '#ffffff') : '#ffffff';
-        newSlides.push({ html: bodyHTML, bg: extractColor(bodyBg) || '#ffffff' });
+        newSlides.push({ html: doc.body ? doc.body.innerHTML : html, bg: '#ffffff', bodyStyle: '', headExtra: '' });
       }
     }
 
