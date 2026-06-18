@@ -528,7 +528,7 @@
     slideCounter.style.display = '';
   }
 
-  // SYNC HTML FROM IFRAME
+  // SYNC HTML FROM IFRAME — strips editing decorations, call on slide switch/export only
   function syncFromIframe() {
     if (currentIndex < 0) return;
     try {
@@ -543,6 +543,46 @@
       slides[currentIndex].html = iDoc.body.innerHTML;
     } catch(e) {}
   }
+
+  // SAVE CONTENT — non-destructive save (clone body, strip decorations, store)
+  function saveContent(pushHistory) {
+    if (currentIndex < 0) return;
+    try {
+      var iDoc = previewIframe.contentDocument;
+      if (!iDoc) return;
+      var clone = iDoc.body.cloneNode(true);
+      clone.querySelectorAll('[contenteditable]').forEach(function(el) {
+        el.removeAttribute('contenteditable');
+        el.style.outline = '';
+        el.style.cursor = '';
+      });
+      clone.querySelectorAll('img').forEach(function(im) { im.style.outline = ''; });
+      var html = clone.innerHTML;
+      if (pushHistory && slides[currentIndex].html !== html) {
+        pushUndo();
+      }
+      slides[currentIndex].html = html;
+    } catch(e) {}
+  }
+
+  // UNDO
+  var undoStack = [];
+  function pushUndo() {
+    undoStack.push(slides.map(function(s) {
+      return { html: s.html, bg: s.bg, bodyStyle: s.bodyStyle, headExtra: s.headExtra };
+    }));
+    if (undoStack.length > 50) undoStack.shift();
+  }
+  function undo() {
+    if (undoStack.length === 0) return;
+    slides = undoStack.pop();
+    renderSidebar();
+    renderPreview();
+    refreshThumb(currentIndex);
+  }
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+  });
 
   // RENDER PREVIEW
   function renderPreview() {
@@ -621,26 +661,18 @@
               'window.parent.postMessage({type:"select-img",src:dragEl.src,alt:dragEl.alt||""},"*");' +
             '}' +
           '}else{' +
-            'window.parent.postMessage({type:"content-changed"},"*");' +
+            'window.parent.postMessage({type:"drag-end"},"*");' +
           '}' +
           'dragEl=null;dragging=false;' +
         '});' +
         'document.addEventListener("input",function(e){' +
-          'if(e.target.contentEditable==="true"){window.parent.postMessage({type:"content-changed"},"*");}' +
+          'if(e.target.contentEditable==="true"){window.parent.postMessage({type:"text-input"},"*");}' +
         '});' +
+        'document.addEventListener("blur",function(e){' +
+          'if(e.target.contentEditable==="true"){window.parent.postMessage({type:"text-commit"},"*");}' +
+        '},true);' +
         'document.addEventListener("keydown",function(e){' +
           'if(e.key==="Escape"){deselect();}' +
-          // Arrow keys to nudge selected element
-          'if(selectedEl&&["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].indexOf(e.key)>-1&&selectedEl.contentEditable!=="true"){' +
-            'e.preventDefault();' +
-            'makeAbsolute(selectedEl);' +
-            'var step=e.shiftKey?10:1;' +
-            'if(e.key==="ArrowLeft")selectedEl.style.left=(parseFloat(selectedEl.style.left)||0)-step+"px";' +
-            'if(e.key==="ArrowRight")selectedEl.style.left=(parseFloat(selectedEl.style.left)||0)+step+"px";' +
-            'if(e.key==="ArrowUp")selectedEl.style.top=(parseFloat(selectedEl.style.top)||0)-step+"px";' +
-            'if(e.key==="ArrowDown")selectedEl.style.top=(parseFloat(selectedEl.style.top)||0)+step+"px";' +
-            'window.parent.postMessage({type:"content-changed"},"*");' +
-          '}' +
         '});' +
         '})();' +
         '<\/scr' + 'ipt>';
@@ -650,7 +682,7 @@
     var bStyle = bodyStyle ? bodyStyle : '';
     return '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
       extraHead +
-      '<style>*{box-sizing:border-box;margin:0;padding:0;}html{width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;}body{width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;background:' + (bg || '#ffffff') + ';' + bStyle + '}[contenteditable]:focus{outline:2px solid #FF6B35!important;}</style>' +
+      '<style>*{box-sizing:border-box;margin:0;padding:0;}html{width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;}body{position:relative;width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;background:' + (bg || '#ffffff') + ';' + bStyle + '}[contenteditable]:focus{outline:2px solid #FF6B35!important;}</style>' +
       '</head><body>' + html + interactiveScript + '</body></html>';
   }
 
@@ -669,8 +701,14 @@
     } else if (msg.type === 'deselect') {
       updateSelectedInfo(null);
       updateImgPanel(null);
-    } else if (msg.type === 'content-changed') {
-      syncFromIframe();
+    } else if (msg.type === 'drag-end') {
+      saveContent(true); // push undo on drag complete
+      refreshThumb(currentIndex);
+    } else if (msg.type === 'text-input') {
+      saveContent(false);
+      refreshThumb(currentIndex);
+    } else if (msg.type === 'text-commit') {
+      saveContent(true); // push undo when done editing
       refreshThumb(currentIndex);
     }
   });
