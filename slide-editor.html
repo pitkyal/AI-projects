@@ -586,6 +586,16 @@
   }
   document.addEventListener('keydown', function(e) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+    // Forward Delete/Backspace to iframe in case iframe lost focus
+    if ((e.key === 'Delete' || e.key === 'Backspace') && document.activeElement !== previewIframe) {
+      try {
+        var iDoc = previewIframe.contentDocument;
+        if (iDoc && iDoc.activeElement && iDoc.activeElement.contentEditable !== 'true') {
+          iDoc.dispatchEvent(new KeyboardEvent('keydown', {key: e.key, bubbles: true}));
+          e.preventDefault();
+        }
+      } catch(err) {}
+    }
   });
 
   // Inject current scale into iframe so drag deltas are correct
@@ -690,6 +700,8 @@
         'function selectEl(el){' +
           'if(sel&&sel!==el)exitEdit();' +
           'sel=el;createOverlay();' +
+          // Ensure iframe has keyboard focus so Delete/keydown events work
+          'document.body.tabIndex=-1;document.body.focus();' +
           'var fs=getComputedFS(el),hex=rgbToHex(window.getComputedStyle(el).color);' +
           'window.parent.postMessage({type:"select-text",fontSize:fs,color:hex,tag:el.tagName},"*");' +
         '}' +
@@ -783,6 +795,7 @@
           // Delete selected element when not editing text
           'if((e.key==="Delete"||e.key==="Backspace")&&sel&&!editing){' +
             'e.preventDefault();' +
+            'freezeContainer(sel);' +
             'removeOverlay();' +
             'sel.parentNode&&sel.parentNode.removeChild(sel);' +
             'sel=null;' +
