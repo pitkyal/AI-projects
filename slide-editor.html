@@ -553,10 +553,10 @@
   function renderPreview() {
     if (currentIndex < 0 || currentIndex >= slides.length) return;
     var slide = slides[currentIndex];
-    previewIframe.srcdoc = buildSlideDoc(slide.html, slide.bg, true);
+    previewIframe.srcdoc = buildSlideDoc(slide.html, slide.bg, true, slide.bodyStyle, slide.headExtra);
   }
 
-  function buildSlideDoc(html, bg, interactive) {
+  function buildSlideDoc(html, bg, interactive, bodyStyle, headExtra) {
     var interactiveScript = '';
     if (interactive) {
       interactiveScript = '<scr' + 'ipt>' +
@@ -601,8 +601,11 @@
         '<\/scr' + 'ipt>';
     }
 
+    var extraHead = headExtra || '';
+    var bStyle = bodyStyle ? bodyStyle : '';
     return '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
-      '<style>*{box-sizing:border-box;margin:0;padding:0;}html,body{width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;background:' + (bg || '#ffffff') + ';}body{font-family:sans-serif;position:relative;}section{width:' + SLIDE_W + 'px!important;height:' + SLIDE_H + 'px!important;min-width:' + SLIDE_W + 'px;min-height:' + SLIDE_H + 'px;}[contenteditable]:focus{outline:2px solid #FF6B35!important;}</style>' +
+      extraHead +
+      '<style>*{box-sizing:border-box;margin:0;padding:0;}html{width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;}body{width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;background:' + (bg || '#ffffff') + ';' + bStyle + '}[contenteditable]:focus{outline:2px solid #FF6B35!important;}</style>' +
       '</head><body>' + html + interactiveScript + '</body></html>';
   }
 
@@ -926,13 +929,25 @@
           inner = inner.split('url("' + uuid + '")').join('url("' + imgMap[uuid] + '")');
         });
 
+        // Also extract helmet styles (fonts etc) from x-dc
+        var helmetStyles = '';
+        var helmetMatch = inner.match(/<helmet>([\s\S]*?)<\/helmet>/);
+        if (helmetMatch) helmetStyles = helmetMatch[1];
+
         var parser2 = new DOMParser();
         var innerDoc = parser2.parseFromString(inner, 'text/html');
         var bundleSections = Array.from(innerDoc.querySelectorAll('section'));
         if (bundleSections.length > 0) {
           bundleSections.forEach(function(sec) {
             var bg = sec.style.backgroundColor || sec.style.background || '#ffffff';
-            newSlides.push({ html: sec.outerHTML, bg: extractColor(bg) || '#ffffff' });
+            // Store innerHTML + section's own style so body can adopt it
+            var secStyle = sec.getAttribute('style') || '';
+            newSlides.push({
+              html: sec.innerHTML,
+              bg: extractColor(bg) || '#ffffff',
+              bodyStyle: secStyle,
+              headExtra: helmetStyles
+            });
           });
         }
       } catch(e) {}
@@ -981,7 +996,7 @@
   exportBtn.addEventListener('click', function() {
     if (slides.length === 0) { alert('No slides to export.'); return; }
     syncFromIframe(); // save current slide edits
-    var slideData = slides.map(function(s) { return { html: s.html || '', bg: s.bg || '#ffffff' }; });
+    var slideData = slides.map(function(s) { return { html: s.html || '', bg: s.bg || '#ffffff', bodyStyle: s.bodyStyle || '', headExtra: s.headExtra || '' }; });
     var exported = buildExportedHTML(slideData);
     downloadFile('presentation.html', exported);
   });
@@ -1023,7 +1038,7 @@
 '    var current = 0;\n' +
 '    var SLIDE_W = 1200, SLIDE_H = 800;\n' +
 '    function buildDoc(slide) {\n' +
-'      return "<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><style>*{box-sizing:border-box;margin:0;padding:0;}html,body{width:"+SLIDE_W+"px;height:"+SLIDE_H+"px;overflow:hidden;background:"+slide.bg+";}body{font-family:sans-serif;}section{width:"+SLIDE_W+"px!important;height:"+SLIDE_H+"px!important;}</style></head><body>"+slide.html+"</body></html>";\n' +
+'      var bStyle = slide.bodyStyle || ""; var hExtra = slide.headExtra || ""; return "<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\">"+hExtra+"<style>*{box-sizing:border-box;margin:0;padding:0;}html,body{width:"+SLIDE_W+"px;height:"+SLIDE_H+"px;overflow:hidden;background:"+slide.bg+";}body{"+bStyle+"}</style></head><body>"+slide.html+"</body></html>";\n' +
 '    }\n' +
 '    function resize() {\n' +
 '      var availW = window.innerWidth - 20;\n' +
