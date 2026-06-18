@@ -528,32 +528,67 @@
     slideCounter.style.display = '';
   }
 
-  // SYNC HTML FROM IFRAME
+  // SYNC HTML FROM IFRAME — saves edits back into originalHTML
   function syncFromIframe() {
-    if (currentIndex < 0) return;
+    if (!originalBlobUrl || currentIndex < 0) return;
     try {
       var iDoc = previewIframe.contentDocument;
       if (!iDoc) return;
-      var body = iDoc.body;
-      var allEl = body.querySelectorAll('[contenteditable]');
-      for (var i = 0; i < allEl.length; i++) {
-        allEl[i].removeAttribute('contenteditable');
-        allEl[i].style.outline = '';
-        allEl[i].style.cursor = '';
+      // Remove edit decorations
+      iDoc.querySelectorAll('[contenteditable]').forEach(function(el) {
+        el.removeAttribute('contenteditable');
+        el.style.outline = '';
+      });
+      // Capture the edited section HTML and update originalHTML
+      var sections = iDoc.querySelectorAll('section');
+      if (sections.length > currentIndex) {
+        var sec = sections[currentIndex];
+        slides[currentIndex].savedHTML = sec.outerHTML;
       }
-      var imgs = body.querySelectorAll('img');
-      for (var j = 0; j < imgs.length; j++) {
-        imgs[j].style.outline = '';
-      }
-      slides[currentIndex].html = body.innerHTML;
     } catch(e) {}
   }
 
   // RENDER PREVIEW
   function renderPreview() {
-    if (currentIndex < 0 || currentIndex >= slides.length) return;
-    var slide = slides[currentIndex];
-    previewIframe.srcdoc = buildSlideDoc(slide.html, slide.bg, true, slide.bodyStyle, slide.headExtra);
+    if (currentIndex < 0) return;
+
+    if (originalBlobUrl) {
+      // Load the original HTML via blob URL so its JS/CSS/fonts all work
+      previewIframe.src = originalBlobUrl;
+      previewIframe.onload = function() {
+        try {
+          var iWin = previewIframe.contentWindow;
+          // Inject script to jump to the right slide and enable editing
+          var script = iWin.document.createElement('script');
+          script.textContent = '(function(){' +
+            'var idx = ' + currentIndex + ';' +
+            'var sections = document.querySelectorAll("section");' +
+            'if(sections.length > 0){' +
+              'sections.forEach(function(s,i){ s.style.display = i===idx ? "" : "none"; });' +
+            '}' +
+            // Make text editable on click
+            'document.addEventListener("click",function(e){' +
+              'var tags=["P","H1","H2","H3","H4","H5","H6","SPAN","DIV","STRONG","EM","B","I","LI","TD","TH"];' +
+              'if(tags.indexOf(e.target.tagName)>-1){' +
+                'e.target.contentEditable="true";' +
+                'e.target.style.outline="2px solid #FF6B35";' +
+                'e.target.focus();' +
+                'var fs=parseInt(window.getComputedStyle(e.target).fontSize)||16;' +
+                'function rgbToHex(rgb){var m=rgb.match(/rgb\\((\\d+),\\s*(\\d+),\\s*(\\d+)\\)/);if(!m)return"#000000";return"#"+[m[1],m[2],m[3]].map(function(x){return parseInt(x).toString(16).padStart(2,"0");}).join("");}' +
+                'var col=rgbToHex(window.getComputedStyle(e.target).color);' +
+                'window.parent.postMessage({type:"select-text",fontSize:fs,color:col,tag:e.target.tagName},"*");' +
+              '}' +
+            '});' +
+            'document.addEventListener("input",function(){window.parent.postMessage({type:"content-changed"},"*");});' +
+          '})();';
+          iWin.document.body.appendChild(script);
+        } catch(ex) {}
+      };
+    } else if (slides[currentIndex]) {
+      var slide = slides[currentIndex];
+      previewIframe.removeAttribute('src');
+      previewIframe.srcdoc = buildSlideDoc(slide.html || '', slide.bg || '#fff', true, slide.bodyStyle, slide.headExtra);
+    }
   }
 
   function buildSlideDoc(html, bg, interactive, bodyStyle, headExtra) {
@@ -761,46 +796,31 @@
     slidesList.innerHTML = '';
     for (var idx = 0; idx < slides.length; idx++) {
       (function(i) {
-        var slide = slides[i];
         var thumb = document.createElement('div');
         thumb.className = 'slide-thumb' + (i === currentIndex ? ' active' : '');
         thumb.dataset.idx = i;
-        thumb.draggable = true;
 
-        var inner = document.createElement('div');
-        inner.className = 'thumb-inner';
-
-        var frame = document.createElement('div');
-        frame.className = 'thumb-frame';
-        frame.style.background = slide.bg || '#ffffff';
-        frame.innerHTML = slide.html;
-
-        inner.appendChild(frame);
+        // Use a scaled iframe for the thumbnail if we have the original HTML
+        if (originalBlobUrl) {
+          var thumbFrame = document.createElement('iframe');
+          thumbFrame.style.cssText = 'width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;border:none;pointer-events:none;transform-origin:top left;transform:scale(0.155);';
+          thumbFrame.src = originalBlobUrl;
+          thumbFrame.onload = function() {
+            try {
+              var sections = thumbFrame.contentDocument.querySelectorAll('section');
+              sections.forEach(function(s, si) { s.style.display = si === i ? '' : 'none'; });
+            } catch(ex) {}
+          };
+          thumb.appendChild(thumbFrame);
+          thumb.style.cssText = 'overflow:hidden;width:' + Math.round(SLIDE_W*0.155) + 'px;height:' + Math.round(SLIDE_H*0.155) + 'px;';
+        }
 
         var idxLabel = document.createElement('div');
         idxLabel.className = 'thumb-index';
         idxLabel.textContent = i + 1;
-
-        var delBtn = document.createElement('button');
-        delBtn.className = 'thumb-delete';
-        delBtn.innerHTML = '&times;';
-        delBtn.title = 'Delete slide';
-        delBtn.addEventListener('click', function(e) {
-          e.stopPropagation();
-          deleteSlide(i);
-        });
-
-        thumb.appendChild(inner);
         thumb.appendChild(idxLabel);
-        thumb.appendChild(delBtn);
 
         thumb.addEventListener('click', function() { selectSlide(i); });
-        thumb.addEventListener('dragstart', onDragStart);
-        thumb.addEventListener('dragover',  onDragOver);
-        thumb.addEventListener('dragleave', onDragLeave);
-        thumb.addEventListener('drop',      onDrop);
-        thumb.addEventListener('dragend',   onDragEnd);
-
         slidesList.appendChild(thumb);
       })(idx);
     }
@@ -812,17 +832,7 @@
     }
   }
 
-  function refreshThumb(idx) {
-    if (idx < 0 || idx >= slides.length) return;
-    var thumbs = slidesList.querySelectorAll('.slide-thumb');
-    var thumb = thumbs[idx];
-    if (!thumb) return;
-    var frame = thumb.querySelector('.thumb-frame');
-    if (frame) {
-      frame.innerHTML = slides[idx].html;
-      frame.style.background = slides[idx].bg || '#ffffff';
-    }
-  }
+  function refreshThumb(idx) { /* thumbnails are live iframes, no refresh needed */ }
 
   // DELETE SLIDE
   function deleteSlide(idx) {
@@ -885,6 +895,10 @@
   }
 
   // IMPORT HTML
+  var originalHTML = null;
+  var slideCount = 0;
+  var originalBlobUrl = null;
+
   importBtn.addEventListener('click', function() {
     importFile.value = '';
     importFile.click();
@@ -894,9 +908,45 @@
     var file = importFile.files[0];
     if (!file) return;
     var reader = new FileReader();
-    reader.onload = function(e) { parseImportedHTML(e.target.result); };
+    reader.onload = function(e) { loadOriginalHTML(e.target.result); };
     reader.readAsText(file);
   });
+
+  function loadOriginalHTML(html) {
+    originalHTML = html;
+
+    // Count sections
+    var sectionMatches = html.match(/<section\b/g);
+    slideCount = sectionMatches ? sectionMatches.length : 0;
+
+    // Try inside bundled template too
+    if (slideCount === 0) {
+      var bundleMatch = html.match(/<script[^>]+type="__bundler\/template"[^>]*>([\s\S]*?)<\/script>/);
+      if (bundleMatch) {
+        try {
+          var inner = JSON.parse(bundleMatch[1].trim());
+          var innerSections = inner.match(/<section\b/g);
+          slideCount = innerSections ? innerSections.length : 1;
+        } catch(e) { slideCount = 1; }
+      } else {
+        slideCount = 1;
+      }
+    }
+
+    // Build fake slides array for sidebar (just indices, rendering done via iframe)
+    slides = [];
+    for (var i = 0; i < slideCount; i++) {
+      slides.push({ index: i });
+    }
+
+    // Create blob URL so iframe can load it with full JS/CSS
+    if (originalBlobUrl) URL.revokeObjectURL(originalBlobUrl);
+    var blob = new Blob([html], { type: 'text/html' });
+    originalBlobUrl = URL.createObjectURL(blob);
+
+    renderSidebar();
+    selectSlide(0);
+  }
 
   function parseImportedHTML(html) {
     var newSlides = [];
