@@ -157,10 +157,10 @@
       pointer-events: none;
     }
     .thumb-frame {
-      width: 960px;
-      height: 540px;
+      width: 1920px;
+      height: 1080px;
       transform-origin: top left;
-      transform: scale(0.179167);
+      transform: scale(0.0896);
       position: absolute;
       top: 0; left: 0;
       overflow: hidden;
@@ -355,7 +355,7 @@
         --panel-w: 200px;
       }
       .thumb-inner { width: 130px; height: 73px; }
-      .thumb-frame { width: 960px; height: 540px; transform: scale(0.135); }
+      .thumb-frame { width: 1920px; height: 1080px; transform: scale(0.0677); }
     }
     @media (max-width: 650px) {
       #panel { display: none; }
@@ -768,7 +768,7 @@
 
         var frame = document.createElement('div');
         frame.className = 'thumb-frame';
-        frame.style.cssText = (slide.bodyStyle || '') + ';width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;transform-origin:top left;transform:scale(0.155);overflow:hidden;';
+        frame.style.cssText = (slide.bodyStyle || '') + ';width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;transform-origin:top left;transform:scale(0.0896);overflow:hidden;';
         frame.innerHTML = slide.html || '';
 
         inner.appendChild(frame);
@@ -812,7 +812,7 @@
     var frame = thumbs[idx].querySelector('.thumb-frame');
     if (frame) {
       frame.innerHTML = slides[idx].html || '';
-      frame.style.cssText = (slides[idx].bodyStyle || '') + ';width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;transform-origin:top left;transform:scale(0.155);overflow:hidden;';
+      frame.style.cssText = (slides[idx].bodyStyle || '') + ';width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;transform-origin:top left;transform:scale(0.0896);overflow:hidden;';
     }
   }
 
