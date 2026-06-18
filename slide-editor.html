@@ -3,28 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Slide Editor</title>
+  <title>Noon Slides Editor</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #1a1a1a;
-      --surface: #242424;
-      --surface2: #2e2e2e;
-      --border: #3a3a3a;
-      --text: #f0f0f0;
-      --text-muted: #999;
-      --accent: #FF6B35;
-      --accent-hover: #ff8555;
+      --noon-yellow: #F5C518;
+      --noon-yellow-hover: #e6b800;
+      --noon-dark: #0D1B2A;
+      --noon-dark2: #152336;
+      --noon-dark3: #1e3048;
+      --noon-border: #243a52;
+      --noon-border-light: #2e4a66;
+      --text: #f0f4f8;
+      --text-muted: #7a9ab8;
+      --text-dim: #4a6a8a;
       --danger: #e05252;
-      --sidebar-w: 200px;
-      --panel-w: 260px;
-      --topbar-h: 52px;
+      --danger-hover: #c94040;
+      --green: #22c55e;
+      --sidebar-w: 210px;
+      --panel-w: 268px;
+      --topbar-h: 56px;
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      background: var(--noon-dark);
       color: var(--text);
       height: 100vh;
       display: flex;
@@ -35,48 +39,85 @@
     /* TOP BAR */
     #topbar {
       height: var(--topbar-h);
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
+      background: var(--noon-dark2);
+      border-bottom: 1px solid var(--noon-border);
       display: flex;
       align-items: center;
-      padding: 0 16px;
-      gap: 12px;
+      padding: 0 20px;
+      gap: 10px;
       flex-shrink: 0;
       z-index: 10;
     }
-    #topbar h1 {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--accent);
+    #topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       margin-right: auto;
-      letter-spacing: 0.5px;
     }
+    #topbar-logo {
+      width: 32px; height: 32px;
+      background: var(--noon-yellow);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    #topbar-logo svg { display: block; }
+    #topbar-title {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.1;
+    }
+    #topbar-title .brand-name {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--noon-yellow);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    #topbar-title .brand-sub {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-muted);
+      letter-spacing: 0.3px;
+    }
+
     .btn {
-      padding: 7px 16px;
-      border-radius: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
       border: none;
       cursor: pointer;
       font-size: 13px;
       font-weight: 600;
-      transition: background 0.15s, opacity 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+      white-space: nowrap;
     }
+    .btn:active { transform: scale(0.97); }
     .btn-ghost {
-      background: var(--surface2);
-      color: var(--text);
-      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--noon-border-light);
     }
-    .btn-ghost:hover { background: var(--border); }
-    .btn-accent {
-      background: var(--accent);
-      color: #fff;
+    .btn-ghost:hover { background: var(--noon-dark3); color: var(--text); border-color: var(--text-dim); }
+    .btn-primary {
+      background: var(--noon-yellow);
+      color: var(--noon-dark);
     }
-    .btn-accent:hover { background: var(--accent-hover); }
+    .btn-primary:hover { background: var(--noon-yellow-hover); box-shadow: 0 2px 12px rgba(245,197,24,0.35); }
     .btn-danger {
       background: transparent;
       color: var(--danger);
       border: 1px solid var(--danger);
     }
     .btn-danger:hover { background: var(--danger); color: #fff; }
+    .btn-subtle {
+      background: var(--noon-dark3);
+      color: var(--text-muted);
+      border: 1px solid var(--noon-border);
+    }
+    .btn-subtle:hover { background: var(--noon-border); color: var(--text); }
 
     /* LAYOUT */
     #layout {
@@ -88,70 +129,72 @@
     /* SIDEBAR */
     #sidebar {
       width: var(--sidebar-w);
-      background: var(--surface);
-      border-right: 1px solid var(--border);
+      background: var(--noon-dark2);
+      border-right: 1px solid var(--noon-border);
       display: flex;
       flex-direction: column;
       overflow: hidden;
       flex-shrink: 0;
     }
     #sidebar-header {
-      padding: 10px 10px 8px;
-      border-bottom: 1px solid var(--border);
+      padding: 12px 12px 10px;
+      border-bottom: 1px solid var(--noon-border);
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
     #sidebar-header span {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--text-muted);
+      letter-spacing: 1.2px;
+      color: var(--text-dim);
     }
     #add-slide-btn {
-      width: 26px; height: 26px;
-      border-radius: 5px;
-      background: var(--accent);
+      width: 28px; height: 28px;
+      border-radius: 7px;
+      background: var(--noon-yellow);
       border: none;
-      color: #fff;
+      color: var(--noon-dark);
       font-size: 18px;
       line-height: 1;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      transition: background 0.15s;
+      font-weight: 700;
+      transition: background 0.15s, transform 0.1s;
     }
-    #add-slide-btn:hover { background: var(--accent-hover); }
+    #add-slide-btn:hover { background: var(--noon-yellow-hover); }
+    #add-slide-btn:active { transform: scale(0.93); }
 
     #slides-list {
       flex: 1;
       overflow-y: auto;
-      padding: 8px 6px;
+      padding: 10px 8px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 7px;
     }
-    #slides-list::-webkit-scrollbar { width: 5px; }
+    #slides-list::-webkit-scrollbar { width: 4px; }
     #slides-list::-webkit-scrollbar-track { background: transparent; }
-    #slides-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    #slides-list::-webkit-scrollbar-thumb { background: var(--noon-border); border-radius: 2px; }
 
     .slide-thumb {
       position: relative;
-      border-radius: 6px;
+      border-radius: 8px;
       overflow: hidden;
       cursor: pointer;
       border: 2px solid transparent;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, box-shadow 0.15s;
       background: #fff;
       flex-shrink: 0;
     }
-    .slide-thumb.active { border-color: var(--accent); }
-    .slide-thumb:hover:not(.active) { border-color: var(--border); }
+    .slide-thumb.active { border-color: var(--noon-yellow); box-shadow: 0 0 0 1px var(--noon-yellow); }
+    .slide-thumb:hover:not(.active) { border-color: var(--noon-border-light); }
     .slide-thumb.drag-over { border-color: #4ea8f7; border-style: dashed; }
 
     .thumb-inner {
-      width: 172px;
-      height: 97px;
+      width: 178px;
+      height: 100px;
       overflow: hidden;
       position: relative;
       pointer-events: none;
@@ -160,7 +203,7 @@
       width: 1920px;
       height: 1080px;
       transform-origin: top left;
-      transform: scale(0.0896);
+      transform: scale(0.0927);
       position: absolute;
       top: 0; left: 0;
       overflow: hidden;
@@ -168,25 +211,26 @@
 
     .thumb-index {
       position: absolute;
-      bottom: 3px; left: 5px;
+      bottom: 4px; left: 6px;
       font-size: 9px;
-      color: rgba(0,0,0,0.5);
+      color: rgba(0,0,0,0.45);
       font-weight: 700;
       pointer-events: none;
     }
     .thumb-delete {
       position: absolute;
-      top: 3px; right: 3px;
-      width: 18px; height: 18px;
+      top: 4px; right: 4px;
+      width: 20px; height: 20px;
       border-radius: 50%;
-      background: rgba(220,80,80,0.85);
+      background: rgba(220,80,80,0.9);
       border: none;
       color: #fff;
-      font-size: 11px;
+      font-size: 12px;
       cursor: pointer;
       display: none;
       align-items: center; justify-content: center;
       line-height: 1;
+      backdrop-filter: blur(4px);
     }
     .slide-thumb:hover .thumb-delete { display: flex; }
 
@@ -197,19 +241,21 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: var(--bg);
+      background: var(--noon-dark);
       overflow: hidden;
       padding: 24px;
-      gap: 16px;
+      gap: 14px;
     }
     #slide-counter {
       font-size: 12px;
-      color: var(--text-muted);
+      color: var(--text-dim);
+      font-weight: 500;
+      letter-spacing: 0.3px;
     }
     #preview-wrapper {
       position: relative;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
-      border-radius: 4px;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.4);
+      border-radius: 6px;
       overflow: hidden;
       background: #fff;
     }
@@ -218,30 +264,109 @@
       border: none;
     }
 
+    /* NO SLIDE STATE */
+    #no-slide-msg {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+    #no-slide-msg .empty-icon {
+      width: 64px; height: 64px;
+      background: var(--noon-dark3);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid var(--noon-border);
+    }
+
+    /* IMPORT DROP ZONE */
+    #import-drop-zone {
+      width: 420px;
+      max-width: 90vw;
+      border: 2px dashed var(--noon-border-light);
+      border-radius: 14px;
+      padding: 36px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--noon-dark2);
+    }
+    #import-drop-zone:hover, #import-drop-zone.dragover {
+      border-color: var(--noon-yellow);
+      background: rgba(245,197,24,0.04);
+    }
+    #import-drop-zone .drop-icon {
+      width: 52px; height: 52px;
+      background: var(--noon-dark3);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid var(--noon-border-light);
+      color: var(--noon-yellow);
+    }
+    #import-drop-zone .drop-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    #import-drop-zone .drop-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    #import-drop-zone .drop-hint {
+      font-size: 11px;
+      color: var(--text-dim);
+      background: var(--noon-dark3);
+      border: 1px solid var(--noon-border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      margin-top: 2px;
+    }
+    #import-drop-zone .drop-hint code {
+      font-family: monospace;
+      color: var(--noon-yellow);
+    }
+    #import-browse-btn {
+      background: var(--noon-yellow);
+      color: var(--noon-dark);
+      border: none;
+      border-radius: 8px;
+      padding: 9px 22px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #import-browse-btn:hover { background: var(--noon-yellow-hover); }
+
     /* RIGHT PANEL */
     #panel {
       width: var(--panel-w);
-      background: var(--surface);
-      border-left: 1px solid var(--border);
+      background: var(--noon-dark2);
+      border-left: 1px solid var(--noon-border);
       overflow-y: auto;
       flex-shrink: 0;
       padding: 0;
     }
-    #panel::-webkit-scrollbar { width: 5px; }
+    #panel::-webkit-scrollbar { width: 4px; }
     #panel::-webkit-scrollbar-track { background: transparent; }
-    #panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    #panel::-webkit-scrollbar-thumb { background: var(--noon-border); border-radius: 2px; }
 
     .panel-section {
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--noon-border);
     }
     .panel-section h3 {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--text-muted);
-      margin-bottom: 12px;
+      letter-spacing: 1.2px;
+      color: var(--text-dim);
+      margin-bottom: 14px;
     }
 
     .control-row {
@@ -259,11 +384,11 @@
     }
 
     input[type="color"] {
-      width: 40px; height: 28px;
-      border: 1px solid var(--border);
-      border-radius: 5px;
+      width: 40px; height: 30px;
+      border: 1px solid var(--noon-border-light);
+      border-radius: 6px;
       padding: 2px;
-      background: var(--surface2);
+      background: var(--noon-dark3);
       cursor: pointer;
     }
 
@@ -273,30 +398,31 @@
       gap: 4px;
     }
     .number-input button {
-      width: 24px; height: 26px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 4px;
+      width: 26px; height: 28px;
+      background: var(--noon-dark3);
+      border: 1px solid var(--noon-border);
+      border-radius: 6px;
       color: var(--text);
       font-size: 14px;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
     }
-    .number-input button:hover { background: var(--border); }
+    .number-input button:hover { background: var(--noon-border); }
     .number-input input {
-      width: 48px; height: 26px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 4px;
+      width: 50px; height: 28px;
+      background: var(--noon-dark3);
+      border: 1px solid var(--noon-border);
+      border-radius: 6px;
       color: var(--text);
       text-align: center;
       font-size: 13px;
     }
-    .number-input input:focus { outline: 1px solid var(--accent); }
+    .number-input input:focus { outline: 1px solid var(--noon-yellow); }
 
     #selected-info {
       font-size: 11px;
-      color: var(--text-muted);
+      color: var(--text-dim);
       margin-bottom: 10px;
       font-style: italic;
     }
@@ -304,22 +430,22 @@
     .img-upload-area {
       width: 100%;
       height: 80px;
-      border: 2px dashed var(--border);
-      border-radius: 6px;
+      border: 2px dashed var(--noon-border-light);
+      border-radius: 8px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      gap: 4px;
+      gap: 5px;
       transition: border-color 0.15s, background 0.15s;
       font-size: 12px;
       color: var(--text-muted);
     }
     .img-upload-area:hover {
-      border-color: var(--accent);
-      background: rgba(255,107,53,0.05);
-      color: var(--accent);
+      border-color: var(--noon-yellow);
+      background: rgba(245,197,24,0.04);
+      color: var(--noon-yellow);
     }
     .img-upload-area svg { opacity: 0.6; }
 
@@ -334,28 +460,89 @@
       width: 100%;
       height: 80px;
       object-fit: contain;
-      border-radius: 5px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--noon-dark3);
+      border: 1px solid var(--noon-border);
     }
 
-    #no-slide-msg {
-      color: var(--text-muted);
-      font-size: 14px;
-      text-align: center;
-    }
-
-    /* Drag ghost */
     .slide-thumb.dragging { opacity: 0.4; }
+
+    /* EXPORT MODAL */
+    #export-modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    #export-modal-overlay.open { display: flex; }
+    #export-modal {
+      background: var(--noon-dark2);
+      border: 1px solid var(--noon-border-light);
+      border-radius: 16px;
+      padding: 28px 28px 24px;
+      width: 380px;
+      max-width: 95vw;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    #export-modal h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #export-modal h2 .modal-icon {
+      width: 34px; height: 34px;
+      background: rgba(245,197,24,0.12);
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--noon-yellow);
+      font-size: 16px;
+    }
+    #export-modal label {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: block;
+      margin-bottom: 7px;
+    }
+    #export-filename {
+      width: 100%;
+      background: var(--noon-dark3);
+      border: 1px solid var(--noon-border-light);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #export-filename:focus { border-color: var(--noon-yellow); }
+    .export-info {
+      font-size: 11px;
+      color: var(--text-dim);
+      background: var(--noon-dark3);
+      border-radius: 7px;
+      padding: 8px 12px;
+      line-height: 1.5;
+    }
+    #export-modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
 
     /* Responsive */
     @media (max-width: 900px) {
-      :root {
-        --sidebar-w: 150px;
-        --panel-w: 200px;
-      }
-      .thumb-inner { width: 130px; height: 73px; }
-      .thumb-frame { width: 1920px; height: 1080px; transform: scale(0.0677); }
+      :root { --sidebar-w: 155px; --panel-w: 210px; }
+      .thumb-inner { width: 135px; height: 76px; }
+      .thumb-frame { transform: scale(0.0703); }
     }
     @media (max-width: 650px) {
       #panel { display: none; }
@@ -367,10 +554,54 @@
 
 <!-- TOP BAR -->
 <div id="topbar">
-  <h1>&#9654; Slide Editor</h1>
-  <button class="btn btn-ghost" id="import-btn">&#8599; Import HTML</button>
-  <button class="btn btn-accent" id="export-btn">&#8600; Export HTML</button>
+  <div id="topbar-brand">
+    <div id="topbar-logo">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <rect x="1" y="1" width="7" height="5" rx="1.5" fill="#0D1B2A"/>
+        <rect x="10" y="1" width="7" height="5" rx="1.5" fill="#0D1B2A"/>
+        <rect x="1" y="8" width="7" height="5" rx="1.5" fill="#0D1B2A"/>
+        <rect x="10" y="8" width="7" height="5" rx="1.5" fill="#0D1B2A"/>
+        <rect x="1" y="15" width="16" height="2" rx="1" fill="#0D1B2A" opacity="0.5"/>
+      </svg>
+    </div>
+    <div id="topbar-title">
+      <span class="brand-name">Noon</span>
+      <span class="brand-sub">Slides Editor</span>
+    </div>
+  </div>
+  <button class="btn btn-ghost" id="import-btn">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    Import HTML
+  </button>
+  <button class="btn btn-primary" id="export-btn">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export HTML
+  </button>
   <input type="file" id="import-file" accept=".html,.htm" style="display:none">
+</div>
+
+<!-- EXPORT MODAL -->
+<div id="export-modal-overlay">
+  <div id="export-modal">
+    <h2>
+      <span class="modal-icon">&#8600;</span>
+      Export Presentation
+    </h2>
+    <div>
+      <label for="export-filename">File name</label>
+      <input type="text" id="export-filename" placeholder="my-presentation" value="presentation" spellcheck="false">
+    </div>
+    <div class="export-info">
+      Exports a standalone <code style="color:var(--noon-yellow);font-family:monospace">.html</code> file — open in any browser to present. Includes all slides, images, and fonts.
+    </div>
+    <div id="export-modal-actions">
+      <button class="btn btn-ghost" id="export-cancel-btn">Cancel</button>
+      <button class="btn btn-primary" id="export-confirm-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download
+      </button>
+    </div>
+  </div>
 </div>
 
 <!-- LAYOUT -->
@@ -391,7 +622,22 @@
     <div id="preview-wrapper">
       <iframe id="preview-iframe" sandbox="allow-scripts allow-same-origin"></iframe>
     </div>
-    <div id="no-slide-msg" style="display:none">No slides yet. Click + to add one.</div>
+    <div id="no-slide-msg">
+      <div id="import-drop-zone">
+        <div class="drop-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <div class="drop-title">Import your presentation</div>
+        <div class="drop-sub">Drag &amp; drop an HTML file here, or click to browse</div>
+        <div class="drop-hint">Accepts <code>.html</code> files — slides-grab format or standard HTML</div>
+        <button id="import-browse-btn">Browse file</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-dim)">— or —</div>
+      <button class="btn btn-subtle" id="new-blank-btn" style="gap:8px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Start with a blank slide
+      </button>
+    </div>
   </div>
 
   <!-- RIGHT PANEL -->
@@ -456,8 +702,15 @@
   var slidesList     = document.getElementById('slides-list');
   var addSlideBtn    = document.getElementById('add-slide-btn');
   var importBtn      = document.getElementById('import-btn');
+  var importBrowseBtn= document.getElementById('import-browse-btn');
+  var newBlankBtn    = document.getElementById('new-blank-btn');
   var exportBtn      = document.getElementById('export-btn');
   var importFile     = document.getElementById('import-file');
+  var exportModal    = document.getElementById('export-modal-overlay');
+  var exportFilename = document.getElementById('export-filename');
+  var exportConfirm  = document.getElementById('export-confirm-btn');
+  var exportCancel   = document.getElementById('export-cancel-btn');
+  var importDropZone = document.getElementById('import-drop-zone');
   var previewIframe  = document.getElementById('preview-iframe');
   var previewWrapper = document.getElementById('preview-wrapper');
   var slideCounter   = document.getElementById('slide-counter');
@@ -528,6 +781,7 @@
     noSlideMsg.style.display = 'none';
     previewWrapper.style.display = '';
     slideCounter.style.display = '';
+    noSlideMsg.style.flexDirection = '';
   }
 
   // SYNC HTML FROM IFRAME — strips editing decorations, call on slide switch/export only
@@ -698,7 +952,7 @@
           'removeOverlay();' +
           'overlay=document.createElement("div");' +
           'overlay.setAttribute("data-editor-ui","1");' +
-          'overlay.style.cssText="position:fixed;box-sizing:border-box;border:2px solid #FF6B35;z-index:2147483646;cursor:move;";' +
+          'overlay.style.cssText="position:fixed;box-sizing:border-box;border:2px solid #F5C518;z-index:2147483646;cursor:move;";' +
           'positionOverlay();' +
           'overlay.addEventListener("mousedown",function(e){' +
             'if(e.target!==overlay)return;' +
@@ -712,7 +966,7 @@
                     'e:"top:calc(50% - 5px);right:-5px",se:"bottom:-5px;right:-5px",' +
                     's:"bottom:-5px;left:calc(50% - 5px)",sw:"bottom:-5px;left:-5px",w:"top:calc(50% - 5px);left:-5px"};' +
             'var cur={nw:"nw-resize",n:"n-resize",ne:"ne-resize",e:"e-resize",se:"se-resize",s:"s-resize",sw:"sw-resize",w:"w-resize"};' +
-            'hd.style.cssText="position:absolute;width:10px;height:10px;background:#FF6B35;border:1px solid #fff;box-sizing:border-box;z-index:2147483647;border-radius:2px;"+pos[h]+";cursor:"+cur[h]+";";' +
+            'hd.style.cssText="position:absolute;width:10px;height:10px;background:#F5C518;border:1px solid #fff;box-sizing:border-box;z-index:2147483647;border-radius:2px;"+pos[h]+";cursor:"+cur[h]+";";' +
             'hd.addEventListener("mousedown",onResizeStart);overlay.appendChild(hd);' +
           '});' +
           'document.body.appendChild(overlay);' +
@@ -840,7 +1094,7 @@
       extraHead +
       '<style>*{box-sizing:border-box;margin:0;padding:0;}' +
       (interactive?'body *{pointer-events:auto!important;}':'') +
-      'html{width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;}body{position:relative;width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;background:' + (bg || '#ffffff') + ';' + bStyle + '}[contenteditable]:focus{outline:2px solid #FF6B35!important;}</style>' +
+      'html{width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;}body{position:relative;width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;background:' + (bg || '#ffffff') + ';' + bStyle + '}[contenteditable]:focus{outline:2px solid #F5C518!important;}</style>' +
       '</head><body>' + html + interactiveScript + '</body></html>';
   }
 
@@ -883,7 +1137,7 @@
     try {
       var imgs = previewIframe.contentDocument.querySelectorAll('img');
       for (var i = 0; i < imgs.length; i++) {
-        if (imgs[i].style.outline && imgs[i].style.outline.indexOf('#FF6B35') > -1) return imgs[i];
+        if (imgs[i].style.outline && imgs[i].style.outline.indexOf('#F5C518') > -1) return imgs[i];
       }
       return null;
     } catch(e) { return null; }
@@ -972,7 +1226,7 @@
       var existingSelected = getSelectedImgFromIframe();
       if (existingSelected) {
         existingSelected.src = dataUrl;
-        existingSelected.style.outline = '2px solid #FF6B35';
+        existingSelected.style.outline = '2px solid #F5C518';
         imgPreviewThumb.src = dataUrl;
         imgPreviewPanel.classList.add('visible');
       } else {
@@ -980,7 +1234,7 @@
         img.src = dataUrl;
         img.style.cssText = 'max-width:80%;max-height:400px;display:block;margin:20px auto;border-radius:4px;';
         iDoc.querySelectorAll('img').forEach(function(im){ im.style.outline=''; });
-        img.style.outline = '2px solid #FF6B35';
+        img.style.outline = '2px solid #F5C518';
         iDoc.body.appendChild(img);
         updateImgPanel(dataUrl);
       }
@@ -1046,7 +1300,8 @@
     }
 
     if (slides.length === 0) {
-      noSlideMsg.style.display = 'block';
+      noSlideMsg.style.display = 'flex';
+      noSlideMsg.style.flexDirection = 'column';
       previewWrapper.style.display = 'none';
       slideCounter.style.display = 'none';
     }
@@ -1069,7 +1324,8 @@
     if (slides.length === 0) {
       currentIndex = -1;
       renderSidebar();
-      noSlideMsg.style.display = 'block';
+      noSlideMsg.style.display = 'flex';
+      noSlideMsg.style.flexDirection = 'column';
       previewWrapper.style.display = 'none';
       slideCounter.style.display = 'none';
       return;
@@ -1124,10 +1380,30 @@
   }
 
   // IMPORT HTML
-  importBtn.addEventListener('click', function() {
-    importFile.value = '';
-    importFile.click();
-  });
+  function triggerImport() { importFile.value = ''; importFile.click(); }
+  importBtn.addEventListener('click', triggerImport);
+  if (importBrowseBtn) importBrowseBtn.addEventListener('click', function(e) { e.stopPropagation(); triggerImport(); });
+  if (newBlankBtn) newBlankBtn.addEventListener('click', function() { addSlide(); });
+
+  // Drop zone on import-drop-zone div
+  if (importDropZone) {
+    importDropZone.addEventListener('click', function(e) {
+      if (e.target === importDropZone || e.target.classList.contains('drop-title') || e.target.classList.contains('drop-sub') || e.target.classList.contains('drop-icon') || e.target.tagName === 'DIV') {
+        triggerImport();
+      }
+    });
+    importDropZone.addEventListener('dragover', function(e) { e.preventDefault(); importDropZone.classList.add('dragover'); });
+    importDropZone.addEventListener('dragleave', function() { importDropZone.classList.remove('dragover'); });
+    importDropZone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      importDropZone.classList.remove('dragover');
+      var file = e.dataTransfer.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) { parseImportedHTML(ev.target.result); };
+      reader.readAsText(file);
+    });
+  }
 
   importFile.addEventListener('change', function() {
     var file = importFile.files[0];
@@ -1223,13 +1499,25 @@
     return '#ffffff';
   }
 
-  // EXPORT HTML
+  // EXPORT HTML — modal with rename
   exportBtn.addEventListener('click', function() {
-    if (slides.length === 0) { alert('No slides to export.'); return; }
-    syncFromIframe(); // save current slide edits
+    if (slides.length === 0) return;
+    exportModal.classList.add('open');
+    exportFilename.focus();
+    exportFilename.select();
+  });
+  exportCancel.addEventListener('click', function() { exportModal.classList.remove('open'); });
+  exportModal.addEventListener('click', function(e) { if (e.target === exportModal) exportModal.classList.remove('open'); });
+  exportConfirm.addEventListener('click', function() {
+    syncFromIframe();
+    var name = (exportFilename.value.trim() || 'presentation').replace(/\.html?$/i, '') + '.html';
     var slideData = slides.map(function(s) { return { html: s.html || '', bg: s.bg || '#ffffff', bodyStyle: s.bodyStyle || '', headExtra: s.headExtra || '' }; });
-    var exported = buildExportedHTML(slideData);
-    downloadFile('presentation.html', exported);
+    downloadFile(name, buildExportedHTML(slideData));
+    exportModal.classList.remove('open');
+  });
+  exportFilename.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') exportConfirm.click();
+    if (e.key === 'Escape') exportModal.classList.remove('open');
   });
 
   function buildExportedHTML(slideData) {
@@ -1324,26 +1612,8 @@
     }, 100);
   }
 
-  // INIT - create two starter slides
-  addSlide(
-    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:24px;padding:60px;">' +
-    '<h1 style="font-size:52px;font-weight:800;color:#222;text-align:center;font-family:sans-serif;line-height:1.2;">Welcome to Slide Editor</h1>' +
-    '<p style="font-size:22px;color:#666;text-align:center;font-family:sans-serif;max-width:600px;">Click any text to edit it inline. Use the right panel to change colors, font sizes, and add images.</p>' +
-    '</div>',
-    '#ffffff'
-  );
-  addSlide(
-    '<div style="display:flex;flex-direction:column;align-items:flex-start;justify-content:center;height:100%;gap:20px;padding:80px;">' +
-    '<h2 style="font-size:40px;font-weight:700;color:#FF6B35;font-family:sans-serif;">Key Features</h2>' +
-    '<ul style="font-size:22px;color:#333;font-family:sans-serif;list-style:none;display:flex;flex-direction:column;gap:12px;">' +
-    '<li>&#10003; &nbsp;Click any text to edit inline</li>' +
-    '<li>&#10003; &nbsp;Drag slides to reorder them</li>' +
-    '<li>&#10003; &nbsp;Add images from your computer</li>' +
-    '<li>&#10003; &nbsp;Export as a standalone presentation</li>' +
-    '</ul>' +
-    '</div>',
-    '#f8f8f8'
-  );
+  // INIT — show empty state (drop zone), no starter slides
+  renderSidebar();
 
 })();
 </script>
