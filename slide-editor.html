@@ -1,3 +1,28 @@
+<!--
+  noon Strategy Team Slide Editor
+  ================================
+  A fully self-contained single-file HTML slide editor. No build tools, no server, no npm.
+  Open directly in any browser.
+
+  INPUT FORMAT:
+  - Only works with slides-grab bundled HTML format.
+  - Slides are stored as JSON in <script type="__bundler/template"> tags.
+  - Assets (images, fonts) are stored in <script type="__bundler/manifest"> as base64 data URIs.
+
+  KEY DECISIONS (don't simplify these without understanding why):
+  - freezeForDelete(): two-pass approach — snapshots ALL sibling bounding rects across the entire
+    ancestor chain BEFORE making any DOM changes, then applies position:absolute to freeze them.
+    This prevents reflow when an element is deleted. Simplifying this will cause elements to jump.
+  - Drag uses transform:translate(x,y), NOT position:absolute — keeps flex layout intact while dragging.
+  - position:absolute is only applied during resize (and delete-freeze), never during normal drag.
+  - Each slide renders inside its own <iframe srcdoc> for style isolation.
+  - postMessage is used for communication between the parent editor and slide iframes.
+
+  BRAND:
+  - noon yellow: #F5E100
+  - Font: Figtree (Google Fonts)
+  - Logo: noon PNG embedded as base64 data URI with filter:invert(1) for dark topbar
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
