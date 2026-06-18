@@ -659,11 +659,32 @@
           'el.style.width=r.width+"px";el.style.height=r.height+"px";' +
           'el.style.margin="0";el.style.flexShrink="0";' +
         '}' +
-        // Freeze only direct body children — these are the flex items that reflow on delete
-        'function freezeAll(){' +
-          'Array.prototype.forEach.call(document.body.children,function(c){' +
-            'if(c===overlay||c.getAttribute("data-editor-ui"))return;' +
-            'makeAbsolute(c);' +
+        // Freeze for delete: walk from sel up to body, snapshot ALL sibling rects first,
+        // then apply position:absolute — two-pass prevents measurement interference
+        'function freezeForDelete(){' +
+          'if(!sel)return;' +
+          'var bodyRect=document.body.getBoundingClientRect();' +
+          'var items=[];' +
+          'var node=sel;' +
+          'while(node&&node!==document.body){' +
+            'var p=node.parentNode;if(!p)break;' +
+            'var refRect=(p===document.body)?bodyRect:p.getBoundingClientRect();' +
+            'Array.prototype.forEach.call(p.children,function(c){' +
+              'if(c===overlay||c.getAttribute("data-editor-ui"))return;' +
+              'items.push({el:c,r:c.getBoundingClientRect(),ref:refRect});' +
+            '});' +
+            'node=p;' +
+          '}' +
+          'items.forEach(function(item){' +
+            'var c=item.el,r=item.r,ref=item.ref;' +
+            'c.style.transform=(c.style.transform||"").replace(/translate\\([^)]*\\)/g,"").trim();' +
+            'c.style.position="absolute";' +
+            'c.style.left=(r.left-ref.left)+"px";' +
+            'c.style.top=(r.top-ref.top)+"px";' +
+            'c.style.width=r.width+"px";' +
+            'c.style.height=r.height+"px";' +
+            'c.style.margin="0";' +
+            'c.style.flexShrink="0";' +
           '});' +
         '}' +
         // Freeze every sibling in el's parent at their current positions (for resize)
@@ -802,7 +823,7 @@
           // Delete selected element when not editing text
           'if((e.key==="Delete"||e.key==="Backspace")&&sel&&!editing){' +
             'e.preventDefault();' +
-            'freezeAll();' +
+            'freezeForDelete();' +
             'removeOverlay();' +
             'sel.parentNode&&sel.parentNode.removeChild(sel);' +
             'sel=null;' +
