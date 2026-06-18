@@ -3,21 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Noon Slides Editor</title>
+  <title>noon Strategy Team Slide Editor</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap');
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --noon-yellow: #F5C518;
-      --noon-yellow-hover: #e6b800;
-      --noon-dark: #0D1B2A;
-      --noon-dark2: #152336;
-      --noon-dark3: #1e3048;
-      --noon-border: #243a52;
-      --noon-border-light: #2e4a66;
-      --text: #f0f4f8;
-      --text-muted: #7a9ab8;
-      --text-dim: #4a6a8a;
+      --noon-yellow: #F5E100;
+      --noon-yellow-hover: #e0ce00;
+      --noon-dark: #0e0e0e;
+      --noon-dark2: #161616;
+      --noon-dark3: #1f1f1f;
+      --noon-border: #2a2a2a;
+      --noon-border-light: #333333;
+      --text: #f2f2f2;
+      --text-muted: #888;
+      --text-dim: #555;
       --danger: #e05252;
       --danger-hover: #c94040;
       --green: #22c55e;
@@ -27,7 +29,7 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      font-family: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--noon-dark);
       color: var(--text);
       height: 100vh;
@@ -55,30 +57,25 @@
       margin-right: auto;
     }
     #topbar-logo {
-      width: 32px; height: 32px;
       background: var(--noon-yellow);
-      border-radius: 8px;
+      border-radius: 7px;
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
+      padding: 4px 8px;
+      height: 36px;
     }
     #topbar-logo svg { display: block; }
+    #topbar-divider {
+      width: 1px;
+      height: 22px;
+      background: var(--noon-border-light);
+      flex-shrink: 0;
+    }
     #topbar-title {
-      display: flex;
-      flex-direction: column;
-      line-height: 1.1;
-    }
-    #topbar-title .brand-name {
       font-size: 13px;
-      font-weight: 800;
-      color: var(--noon-yellow);
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-    }
-    #topbar-title .brand-sub {
-      font-size: 10px;
-      font-weight: 500;
+      font-weight: 600;
       color: var(--text-muted);
-      letter-spacing: 0.3px;
+      letter-spacing: 0.2px;
     }
 
     .btn {
@@ -556,23 +553,14 @@
 <div id="topbar">
   <div id="topbar-brand">
     <div id="topbar-logo">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <rect x="1" y="1" width="7" height="5" rx="1.5" fill="#0D1B2A"/>
-        <rect x="10" y="1" width="7" height="5" rx="1.5" fill="#0D1B2A"/>
-        <rect x="1" y="8" width="7" height="5" rx="1.5" fill="#0D1B2A"/>
-        <rect x="10" y="8" width="7" height="5" rx="1.5" fill="#0D1B2A"/>
-        <rect x="1" y="15" width="16" height="2" rx="1" fill="#0D1B2A" opacity="0.5"/>
+      <!-- noon wordmark -->
+      <svg viewBox="0 0 120 52" width="60" height="26" xmlns="http://www.w3.org/2000/svg">
+        <text x="2" y="34" font-family="'Figtree',Arial,sans-serif" font-weight="900" font-size="34" fill="#0e0e0e" letter-spacing="-1">noon</text>
       </svg>
     </div>
-    <div id="topbar-title">
-      <span class="brand-name">Noon</span>
-      <span class="brand-sub">Slides Editor</span>
-    </div>
+    <div id="topbar-divider"></div>
+    <div id="topbar-title">Strategy Team Slide Editor</div>
   </div>
-  <button class="btn btn-ghost" id="import-btn">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-    Import HTML
-  </button>
   <button class="btn btn-primary" id="export-btn">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
     Export HTML
@@ -701,7 +689,6 @@
   // DOM REFS
   var slidesList     = document.getElementById('slides-list');
   var addSlideBtn    = document.getElementById('add-slide-btn');
-  var importBtn      = document.getElementById('import-btn');
   var importBrowseBtn= document.getElementById('import-browse-btn');
   var newBlankBtn    = document.getElementById('new-blank-btn');
   var exportBtn      = document.getElementById('export-btn');
@@ -1381,7 +1368,6 @@
 
   // IMPORT HTML
   function triggerImport() { importFile.value = ''; importFile.click(); }
-  importBtn.addEventListener('click', triggerImport);
   if (importBrowseBtn) importBrowseBtn.addEventListener('click', function(e) { e.stopPropagation(); triggerImport(); });
   if (newBlankBtn) newBlankBtn.addEventListener('click', function() { addSlide(); });
 
