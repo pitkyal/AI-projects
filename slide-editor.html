@@ -480,7 +480,7 @@
     var main = document.getElementById('main');
     var availW = main.clientWidth - 48;
     var availH = main.clientHeight - 80;
-    var scale = Math.min(availW / SLIDE_W, availH / SLIDE_H, 1);
+    var scale = Math.min(availW / SLIDE_W, availH / SLIDE_H);
     var w = Math.round(SLIDE_W * scale);
     var h = Math.round(SLIDE_H * scale);
     previewIframe.style.width  = SLIDE_W + 'px';
@@ -602,7 +602,7 @@
     }
 
     return '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
-      '<style>*{box-sizing:border-box;margin:0;padding:0;}html,body{width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;background:' + (bg || '#ffffff') + ';}body{font-family:sans-serif;}[contenteditable]:focus{outline:2px solid #FF6B35!important;}</style>' +
+      '<style>*{box-sizing:border-box;margin:0;padding:0;}html,body{width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;background:' + (bg || '#ffffff') + ';}body{font-family:sans-serif;position:relative;}section{width:' + SLIDE_W + 'px!important;height:' + SLIDE_H + 'px!important;min-width:' + SLIDE_W + 'px;min-height:' + SLIDE_H + 'px;}[contenteditable]:focus{outline:2px solid #FF6B35!important;}</style>' +
       '</head><body>' + html + interactiveScript + '</body></html>';
   }
 
@@ -1000,7 +1000,7 @@
 '    var current = 0;\n' +
 '    var SLIDE_W = 960, SLIDE_H = 540;\n' +
 '    function buildDoc(slide) {\n' +
-'      return "<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><style>*{box-sizing:border-box;margin:0;padding:0;}html,body{width:"+SLIDE_W+"px;height:"+SLIDE_H+"px;overflow:hidden;background:"+slide.bg+";}body{font-family:sans-serif;}</style></head><body>"+slide.html+"</body></html>";\n' +
+'      return "<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><style>*{box-sizing:border-box;margin:0;padding:0;}html,body{width:"+SLIDE_W+"px;height:"+SLIDE_H+"px;overflow:hidden;background:"+slide.bg+";}body{font-family:sans-serif;}section{width:"+SLIDE_W+"px!important;height:"+SLIDE_H+"px!important;}</style></head><body>"+slide.html+"</body></html>";\n' +
 '    }\n' +
 '    function resize() {\n' +
 '      var availW = window.innerWidth - 20;\n' +
