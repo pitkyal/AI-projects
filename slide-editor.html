@@ -627,12 +627,12 @@
 
         // Get current translate values from element style
         'function getTranslate(el){' +
-          'var m=(el.style.transform||"").match(/translate\\\\(([^,]+)px,([^)]+)px\\\\)/);' +
+          'var m=(el.style.transform||"").match(/translate\\(([^,]+)px,([^)]+)px\\)/);' +
           'return m?{x:parseFloat(m[1]),y:parseFloat(m[2])}:{x:0,y:0};' +
         '}' +
         // Move element using CSS transform (never disturbs document flow)
         'function applyTranslate(el,tx,ty){' +
-          'var base=(el.style.transform||"").replace(/translate\\\\([^)]*\\\\)/g,"").trim();' +
+          'var base=(el.style.transform||"").replace(/translate\\([^)]*\\)/g,"").trim();' +
           'el.style.transform="translate("+tx+"px,"+ty+"px)"+(base?" "+base:"");' +
         '}' +
 
@@ -641,7 +641,7 @@
           'if(el.style.position==="absolute")return;' +
           'var r=el.getBoundingClientRect(),br=document.body.getBoundingClientRect();' +
           // absorb any translate offset into left/top so we start clean
-          'el.style.transform=(el.style.transform||"").replace(/translate\\\\([^)]*\\\\)/g,"").trim();' +
+          'el.style.transform=(el.style.transform||"").replace(/translate\\([^)]*\\)/g,"").trim();' +
           'el.style.position="absolute";' +
           'el.style.left=(r.left-br.left)+"px";el.style.top=(r.top-br.top)+"px";' +
           'el.style.width=r.width+"px";el.style.height=r.height+"px";' +
@@ -718,8 +718,8 @@
         'document.addEventListener("mousemove",function(e){' +
           'if(resizeEl){onResizeMove(e);return;}' +
           'if(!dragActive||!sel)return;' +
-          'var dx=(e.clientX-dragOX)/getScale(),dy=(e.clientY-dragOY)/getScale();' +
-          'if(!dragging&&(Math.abs(e.clientX-dragOX)+Math.abs(e.clientY-dragOY))>4)dragging=true;' +
+          'var dx=e.clientX-dragOX,dy=e.clientY-dragOY;' +
+          'if(!dragging&&(Math.abs(dx)+Math.abs(dy))>4)dragging=true;' +
           'if(dragging){' +
             'dragTX+=dx;dragTY+=dy;' +
             'applyTranslate(sel,dragTX,dragTY);' +
