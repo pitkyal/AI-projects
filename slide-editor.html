@@ -659,7 +659,16 @@
           'el.style.width=r.width+"px";el.style.height=r.height+"px";' +
           'el.style.margin="0";el.style.flexShrink="0";' +
         '}' +
-        // Freeze every sibling in el's parent at their current positions (prevents flex reflow during resize)
+        // Freeze ALL elements in the slide body at their current visual positions
+        'function freezeAll(){' +
+          'var all=document.body.querySelectorAll("*");' +
+          'for(var i=all.length-1;i>=0;i--){' +
+            'var c=all[i];' +
+            'if(c===overlay||c.getAttribute("data-editor-ui"))continue;' +
+            'if(c.nodeType===1)makeAbsolute(c);' +
+          '}' +
+        '}' +
+        // Freeze every sibling in el's parent at their current positions (for resize)
         'function freezeContainer(el){' +
           'var p=el.parentNode;if(!p)return;' +
           'Array.prototype.forEach.call(p.children,function(c){if(c!==overlay)makeAbsolute(c);});' +
@@ -795,7 +804,7 @@
           // Delete selected element when not editing text
           'if((e.key==="Delete"||e.key==="Backspace")&&sel&&!editing){' +
             'e.preventDefault();' +
-            'freezeContainer(sel);' +
+            'freezeAll();' +
             'removeOverlay();' +
             'sel.parentNode&&sel.parentNode.removeChild(sel);' +
             'sel=null;' +
