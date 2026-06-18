@@ -559,6 +559,8 @@
         el.style.cursor = '';
       });
       clone.querySelectorAll('img').forEach(function(im) { im.style.outline = ''; });
+      // Remove any editor overlay divs that got cloned into the body
+      clone.querySelectorAll('[data-editor-ui]').forEach(function(el) { el.parentNode && el.parentNode.removeChild(el); });
       var html = clone.innerHTML;
       if (pushHistory && slides[currentIndex].html !== html) {
         pushUndo();
@@ -657,6 +659,7 @@
         'function createOverlay(){' +
           'removeOverlay();' +
           'overlay=document.createElement("div");' +
+          'overlay.setAttribute("data-editor-ui","1");' +
           'overlay.style.cssText="position:fixed;box-sizing:border-box;border:2px solid #FF6B35;z-index:2147483646;cursor:move;";' +
           'positionOverlay();' +
           'overlay.addEventListener("mousedown",function(e){' +
@@ -703,7 +706,7 @@
           '}' +
         '}' +
 
-        // Click on slide content (not overlay): select the clicked element
+        // Click on slide content (not overlay): select the clicked element + enable drag
         'document.addEventListener("mousedown",function(e){' +
           'var t=e.target;' +
           'if(overlay&&(t===overlay||overlay.contains(t)))return;' +
@@ -711,7 +714,11 @@
           'if(editing&&sel&&(t===sel||sel.contains(t)))return;' +
           'if(editing)exitEdit();' +
           'var block=findBlock(t);if(!block){deselect();return;}' +
-          'freshSel=(sel!==block);selectEl(block);e.preventDefault();' +
+          'freshSel=(sel!==block);selectEl(block);' +
+          // Enable drag from this mousedown (one-motion click+drag like PPT)
+          'var tr=getTranslate(block);dragTX=tr.x;dragTY=tr.y;' +
+          'dragActive=true;dragOX=e.clientX;dragOY=e.clientY;dragging=false;' +
+          'e.preventDefault();' +
         '});' +
 
         // MOUSEMOVE: translate for drag (never touches layout), resize uses absolute
@@ -732,7 +739,7 @@
           'if(resizeEl){onResizeEnd();return;}' +
           'var wasDragging=dragging;' +
           'dragActive=false;dragging=false;' +
-          'if(wasDragging){window.parent.postMessage({type:"drag-end"},"*");return;}' +
+          'if(wasDragging){positionOverlay();window.parent.postMessage({type:"drag-end"},"*");return;}' +
           // Clean click on overlay: check what element is actually underneath
           'if(e.target===overlay&&!freshSel&&sel&&!editing){' +
             'overlay.style.pointerEvents="none";' +
@@ -773,6 +780,14 @@
         'document.addEventListener("keydown",function(e){' +
           'if(e.key==="Escape"){if(editing)exitEdit();else deselect();}' +
           'if((e.ctrlKey||e.metaKey)&&e.key==="z"){e.preventDefault();window.parent.postMessage({type:"undo-request"},"*");}' +
+          // Delete selected element when not editing text
+          'if((e.key==="Delete"||e.key==="Backspace")&&sel&&!editing){' +
+            'e.preventDefault();' +
+            'removeOverlay();' +
+            'sel.parentNode&&sel.parentNode.removeChild(sel);' +
+            'sel=null;' +
+            'window.parent.postMessage({type:"drag-end"},"*");' +
+          '}' +
         '});' +
         '})();' +
         '<\/scr' + 'ipt>';
