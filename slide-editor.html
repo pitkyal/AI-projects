@@ -607,7 +607,9 @@
     if (interactive) {
       interactiveScript = '<scr' + 'ipt>' +
         '(function(){' +
-        'var sel=null,editing=false,dragEl=null,dragOX=0,dragOY=0,dragging=false;' +
+        // State: sel=selected element, editing=contenteditable active
+        // clickedEl=element mousedown landed on, dragging=moved >6px since mousedown
+        'var sel=null,editing=false,clickedEl=null,dragOX=0,dragOY=0,dragging=false,freshSel=false;' +
         'var resizeEl=null,resizeHandle=null,resizeStartX=0,resizeStartY=0,resizeStartRect={};' +
         'var overlay=null;' +
 
@@ -615,158 +617,155 @@
         'function rgbToHex(rgb){var m=rgb.match(/rgb\\\\((\\\\d+),\\\\s*(\\\\d+),\\\\s*(\\\\d+)\\\\)/);if(!m)return"#000000";return"#"+[m[1],m[2],m[3]].map(function(x){return parseInt(x).toString(16).padStart(2,"0");}).join("");}' +
         'function getComputedFS(el){return parseInt(window.getComputedStyle(el).fontSize)||16;}' +
 
-        // Make element absolutely positioned, locking width AND height
+        // Walk up from e.target past inline tags to find nearest block element
+        'function findBlock(t){' +
+          'if(!t||t===document.body||t===document.documentElement)return null;' +
+          'var inlineTags=["SPAN","A","STRONG","EM","B","I","U","SMALL","SUP","SUB","CODE","ABBR","CITE","S","MARK","TIME","BR","WBR"];' +
+          'var el=t;' +
+          'while(el&&el!==document.body&&inlineTags.indexOf(el.tagName)>-1){el=el.parentNode;}' +
+          'if(!el||el===document.body||el===document.documentElement)return t;' +
+          'return el;' +
+        '}' +
+
+        // Make element absolutely positioned (locks position AND size)
         'function makeAbsolute(el){' +
           'if(el.style.position==="absolute")return;' +
           'var r=el.getBoundingClientRect();' +
           'var br=document.body.getBoundingClientRect();' +
-          'var l=r.left-br.left, t=r.top-br.top, w=r.width, h=r.height;' +
           'el.style.position="absolute";' +
-          'el.style.left=l+"px";el.style.top=t+"px";' +
-          'el.style.width=w+"px";el.style.height=h+"px";' +
+          'el.style.left=(r.left-br.left)+"px";' +
+          'el.style.top=(r.top-br.top)+"px";' +
+          'el.style.width=r.width+"px";' +
+          'el.style.height=r.height+"px";' +
           'el.style.margin="0";el.style.flexShrink="0";' +
         '}' +
 
-        // Overlay: floating selection box with 8 resize handles
+        // Overlay: floating selection border with 8 resize handles
         'function createOverlay(){' +
           'removeOverlay();' +
           'overlay=document.createElement("div");' +
-          'overlay.id="__sel_overlay";' +
-          'overlay.style.cssText="position:absolute;pointer-events:none;box-sizing:border-box;border:2px solid #FF6B35;z-index:99999;";' +
+          'overlay.style.cssText="position:fixed;pointer-events:none;box-sizing:border-box;border:2px solid #FF6B35;z-index:2147483646;";' +
           'positionOverlay();' +
-          'var handles=["nw","n","ne","e","se","s","sw","w"];' +
-          'handles.forEach(function(h){' +
+          '["nw","n","ne","e","se","s","sw","w"].forEach(function(h){' +
             'var hd=document.createElement("div");' +
             'hd.dataset.handle=h;' +
-            'hd.style.cssText="position:absolute;width:10px;height:10px;background:#FF6B35;border:1px solid #fff;box-sizing:border-box;pointer-events:all;z-index:100000;border-radius:2px;";' +
-            'var cursors={nw:"nw-resize",n:"n-resize",ne:"ne-resize",e:"e-resize",se:"se-resize",s:"s-resize",sw:"sw-resize",w:"w-resize"};' +
-            'hd.style.cursor=cursors[h];' +
-            'setHandlePos(hd,h);' +
+            'var pos={nw:"top:-5px;left:-5px",n:"top:-5px;left:calc(50% - 5px)",ne:"top:-5px;right:-5px",' +
+                    'e:"top:calc(50% - 5px);right:-5px",se:"bottom:-5px;right:-5px",' +
+                    's:"bottom:-5px;left:calc(50% - 5px)",sw:"bottom:-5px;left:-5px",w:"top:calc(50% - 5px);left:-5px"};' +
+            'var cur={nw:"nw-resize",n:"n-resize",ne:"ne-resize",e:"e-resize",se:"se-resize",s:"s-resize",sw:"sw-resize",w:"w-resize"};' +
+            'hd.style.cssText="position:absolute;width:10px;height:10px;background:#FF6B35;border:1px solid #fff;box-sizing:border-box;pointer-events:all;z-index:2147483647;border-radius:2px;"+pos[h]+";cursor:"+cur[h]+";";' +
             'hd.addEventListener("mousedown",onResizeStart);' +
             'overlay.appendChild(hd);' +
           '});' +
           'document.body.appendChild(overlay);' +
         '}' +
-        'function setHandlePos(hd,h){' +
-          'var s="position:absolute;width:10px;height:10px;background:#FF6B35;border:1px solid #fff;box-sizing:border-box;pointer-events:all;z-index:100000;border-radius:2px;";' +
-          'var pos={nw:"top:-5px;left:-5px",n:"top:-5px;left:calc(50% - 5px)",ne:"top:-5px;right:-5px",e:"top:calc(50% - 5px);right:-5px",se:"bottom:-5px;right:-5px",s:"bottom:-5px;left:calc(50% - 5px)",sw:"bottom:-5px;left:-5px",w:"top:calc(50% - 5px);left:-5px"};' +
-          'var cursors={nw:"nw-resize",n:"n-resize",ne:"ne-resize",e:"e-resize",se:"se-resize",s:"s-resize",sw:"sw-resize",w:"w-resize"};' +
-          'hd.style.cssText=s+pos[h]+";cursor:"+cursors[h]+";";' +
-        '}' +
         'function positionOverlay(){' +
           'if(!overlay||!sel)return;' +
           'var r=sel.getBoundingClientRect();' +
-          'var br=document.body.getBoundingClientRect();' +
-          'overlay.style.left=(r.left-br.left-2)+"px";' +
-          'overlay.style.top=(r.top-br.top-2)+"px";' +
-          'overlay.style.width=(r.width+4)+"px";' +
-          'overlay.style.height=(r.height+4)+"px";' +
+          'overlay.style.left=(r.left-2)+"px";overlay.style.top=(r.top-2)+"px";' +
+          'overlay.style.width=(r.width+4)+"px";overlay.style.height=(r.height+4)+"px";' +
         '}' +
         'function removeOverlay(){if(overlay){overlay.parentNode&&overlay.parentNode.removeChild(overlay);overlay=null;}}' +
 
-        // Select an element (PPT-style: first click = select box)
         'function selectEl(el){' +
-          'if(sel&&sel!==el){exitEdit();}' +
+          'if(sel&&sel!==el)exitEdit();' +
           'sel=el;' +
-          'el.style.cursor="move";' +
           'createOverlay();' +
           'var fs=getComputedFS(el);' +
           'var hex=rgbToHex(window.getComputedStyle(el).color);' +
           'window.parent.postMessage({type:"select-text",fontSize:fs,color:hex,tag:el.tagName},"*");' +
         '}' +
-        'function deselect(){exitEdit();removeOverlay();if(sel){sel.style.cursor="";}sel=null;window.parent.postMessage({type:"deselect"},"*");}' +
-        'function exitEdit(){' +
-          'if(sel&&editing){sel.removeAttribute("contenteditable");sel.style.cursor="move";editing=false;window.parent.postMessage({type:"text-commit"},"*");}' +
+        'function deselect(){' +
+          'exitEdit();removeOverlay();' +
+          'sel=null;' +
+          'window.parent.postMessage({type:"deselect"},"*");' +
         '}' +
-        'function enterEdit(el,ex,ey){' +
-          'editing=true;' +
-          'el.contentEditable="true";' +
-          'el.style.cursor="text";' +
-          'el.focus();' +
-          'if(ex!==undefined&&document.caretRangeFromPoint){' +
-            'var range=document.caretRangeFromPoint(ex,ey);' +
-            'if(range){var s=window.getSelection();s.removeAllRanges();s.addRange(range);}' +
+        'function exitEdit(){' +
+          'if(editing&&sel){sel.removeAttribute("contenteditable");editing=false;window.parent.postMessage({type:"text-commit"},"*");}' +
+        '}' +
+        'function enterEdit(ex,ey){' +
+          'if(!sel)return;' +
+          'editing=true;sel.contentEditable="true";sel.focus();' +
+          'if(ex!=null&&document.caretRangeFromPoint){' +
+            'var rng=document.caretRangeFromPoint(ex,ey);' +
+            'if(rng){var s=window.getSelection();s.removeAllRanges();s.addRange(rng);}' +
           '}' +
         '}' +
 
-        // CLICK: select on first click, edit on second click (if already selected)
-        // Walk up from clicked element to a direct child of body (the "block" to select)
-        'function topLevelEl(t){' +
-          'if(!t||t===document.body||t===document.documentElement)return null;' +
-          'var el=t;' +
-          'while(el.parentNode&&el.parentNode!==document.body){el=el.parentNode;}' +
-          'if(el===document.body||el===document.documentElement)return null;' +
-          'return el;' +
-        '}' +
-
+        // MOUSEDOWN: record what was clicked, set up drag tracking — never enter edit here
         'document.addEventListener("mousedown",function(e){' +
           'var t=e.target;' +
-          // ignore overlay handles (they have their own handlers)
-          'if(overlay&&overlay.contains(t))return;' +
-          'if(t===document.body||t===document.documentElement){deselect();return;}' +
-          // if currently editing and click is inside the edited element, let it through for cursor positioning
+          'if(overlay&&overlay.contains(t))return;' // resize handles handle themselves
+          + 'if(t===document.body||t===document.documentElement){deselect();return;}' +
+          // If we're editing and click is inside the editing element, let browser handle cursor
           'if(editing&&sel&&(t===sel||sel.contains(t)))return;' +
-          // if click is inside currently selected element → enter edit mode
-          'if(sel&&(t===sel||sel.contains(t))){' +
-            'if(!editing){enterEdit(sel,e.clientX,e.clientY);}' +
-            'dragEl=sel;dragOX=e.clientX;dragOY=e.clientY;dragging=false;' +
-            'e.preventDefault();return;' +
-          '}' +
-          // click on new element — select the top-level block
-          'if(editing){exitEdit();}' +
-          'var block=topLevelEl(t);' +
+          // Stop current edit if clicking elsewhere
+          'if(editing)exitEdit();' +
+          // Find the block element to operate on
+          'var block=findBlock(t);' +
           'if(!block){deselect();return;}' +
-          'selectEl(block);' +
-          'dragEl=block;dragOX=e.clientX;dragOY=e.clientY;dragging=false;' +
+          // Track for drag
+          'clickedEl=block;dragOX=e.clientX;dragOY=e.clientY;dragging=false;' +
+          // If clicking a different element, select it (freshSel=true = just selected this mousedown)
+          'if(sel!==block){selectEl(block);freshSel=true;}else{freshSel=false;}' +
           'e.preventDefault();' +
         '});' +
 
-        // DRAG to move
+        // MOUSEMOVE: drag to move selected element
         'document.addEventListener("mousemove",function(e){' +
           'if(resizeEl){onResizeMove(e);return;}' +
-          'if(!dragEl||editing)return;' +
+          'if(!clickedEl||editing)return;' +
           'var dx=(e.clientX-dragOX)/getScale(),dy=(e.clientY-dragOY)/getScale();' +
-          'if(!dragging&&(Math.abs(e.clientX-dragOX)+Math.abs(e.clientY-dragOY))>6){' +
-            'dragging=true;makeAbsolute(dragEl);' +
+          'if(!dragging&&(Math.abs(e.clientX-dragOX)+Math.abs(e.clientY-dragOY))>5){'
+            + 'dragging=true;makeAbsolute(clickedEl);' +
           '}' +
           'if(dragging){' +
-            'dragEl.style.left=(parseFloat(dragEl.style.left)||0)+dx+"px";' +
-            'dragEl.style.top=(parseFloat(dragEl.style.top)||0)+dy+"px";' +
-            'dragOX=e.clientX;dragOY=e.clientY;' +
-            'positionOverlay();' +
+            'clickedEl.style.left=(parseFloat(clickedEl.style.left)||0)+dx+"px";' +
+            'clickedEl.style.top=(parseFloat(clickedEl.style.top)||0)+dy+"px";' +
+            'dragOX=e.clientX;dragOY=e.clientY;positionOverlay();' +
           '}' +
         '});' +
 
+        // MOUSEUP: if no drag occurred and this was a second click on same element → enter edit
         'document.addEventListener("mouseup",function(e){' +
           'if(resizeEl){onResizeEnd();return;}' +
-          'if(dragging){window.parent.postMessage({type:"drag-end"},"*");}' +
-          'dragEl=null;dragging=false;' +
+          'var wasDragging=dragging;' +
+          'dragging=false;' +
+          'if(wasDragging){window.parent.postMessage({type:"drag-end"},"*");clickedEl=null;return;}' +
+          // Click (no drag): if element was already selected before this mousedown, enter edit
+          'if(!freshSel&&clickedEl&&sel===clickedEl){enterEdit(e.clientX,e.clientY);}' +
+          'clickedEl=null;' +
         '});' +
 
-        // RESIZE logic
+        // RESIZE
         'function onResizeStart(e){' +
           'e.stopPropagation();e.preventDefault();' +
+          'if(!sel)return;' +
           'resizeEl=sel;resizeHandle=e.target.dataset.handle;' +
           'makeAbsolute(resizeEl);' +
           'resizeStartX=e.clientX;resizeStartY=e.clientY;' +
-          'resizeStartRect={l:parseFloat(resizeEl.style.left),t:parseFloat(resizeEl.style.top),w:parseFloat(resizeEl.style.width),h:parseFloat(resizeEl.style.height)};' +
+          'resizeStartRect={l:parseFloat(resizeEl.style.left)||0,t:parseFloat(resizeEl.style.top)||0,' +
+                           'w:parseFloat(resizeEl.style.width)||resizeEl.offsetWidth,' +
+                           'h:parseFloat(resizeEl.style.height)||resizeEl.offsetHeight};' +
         '}' +
         'function onResizeMove(e){' +
           'if(!resizeEl)return;' +
           'var sc=getScale();' +
           'var dx=(e.clientX-resizeStartX)/sc,dy=(e.clientY-resizeStartY)/sc;' +
-          'var r=resizeStartRect,nl=r.l,nt=r.t,nw=r.w,nh=r.h;' +
-          'var h=resizeHandle;' +
-          'if(h.indexOf("e")>-1)nw=Math.max(40,r.w+dx);' +
-          'if(h.indexOf("s")>-1)nh=Math.max(20,r.h+dy);' +
-          'if(h.indexOf("w")>-1){nw=Math.max(40,r.w-dx);nl=r.l+r.w-nw;}' +
-          'if(h.indexOf("n")>-1){nh=Math.max(20,r.h-dy);nt=r.t+r.h-nh;}' +
+          'var r=resizeStartRect,nl=r.l,nt=r.t,nw=r.w,nh=r.h,hh=resizeHandle;' +
+          'if(hh.indexOf("e")>-1)nw=Math.max(40,r.w+dx);' +
+          'if(hh.indexOf("s")>-1)nh=Math.max(20,r.h+dy);' +
+          'if(hh.indexOf("w")>-1){nw=Math.max(40,r.w-dx);nl=r.l+r.w-nw;}' +
+          'if(hh.indexOf("n")>-1){nh=Math.max(20,r.h-dy);nt=r.t+r.h-nh;}' +
           'resizeEl.style.left=nl+"px";resizeEl.style.top=nt+"px";' +
           'resizeEl.style.width=nw+"px";resizeEl.style.height=nh+"px";' +
           'positionOverlay();' +
         '}' +
-        'function onResizeEnd(){resizeEl=null;resizeHandle=null;window.parent.postMessage({type:"drag-end"},"*");}' +
+        'function onResizeEnd(){resizeEl=null;window.parent.postMessage({type:"drag-end"},"*");}' +
 
+        'document.addEventListener("dblclick",function(e){' +
+          'if(sel&&!editing){enterEdit(e.clientX,e.clientY);}' +
+        '});' +
         'document.addEventListener("input",function(e){' +
           'if(e.target.contentEditable==="true"){window.parent.postMessage({type:"text-input"},"*");}' +
         '});' +
