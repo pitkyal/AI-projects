@@ -607,9 +607,7 @@
     if (interactive) {
       interactiveScript = '<scr' + 'ipt>' +
         '(function(){' +
-        // State: sel=selected element, editing=contenteditable active
-        // clickedEl=element mousedown landed on, dragging=moved >6px since mousedown
-        'var sel=null,editing=false,clickedEl=null,dragOX=0,dragOY=0,dragging=false,freshSel=false;' +
+        'var sel=null,editing=false,dragActive=false,dragOX=0,dragOY=0,dragging=false,freshSel=false;' +
         'var resizeEl=null,resizeHandle=null,resizeStartX=0,resizeStartY=0,resizeStartRect={};' +
         'var overlay=null;' +
 
@@ -617,35 +615,44 @@
         'function rgbToHex(rgb){var m=rgb.match(/rgb\\\\((\\\\d+),\\\\s*(\\\\d+),\\\\s*(\\\\d+)\\\\)/);if(!m)return"#000000";return"#"+[m[1],m[2],m[3]].map(function(x){return parseInt(x).toString(16).padStart(2,"0");}).join("");}' +
         'function getComputedFS(el){return parseInt(window.getComputedStyle(el).fontSize)||16;}' +
 
-        // Walk up from e.target past inline tags to find nearest block element
+        // Walk up past inline tags to nearest block element
         'function findBlock(t){' +
           'if(!t||t===document.body||t===document.documentElement)return null;' +
-          'var inlineTags=["SPAN","A","STRONG","EM","B","I","U","SMALL","SUP","SUB","CODE","ABBR","CITE","S","MARK","TIME","BR","WBR"];' +
+          'var inline=["SPAN","A","STRONG","EM","B","I","U","SMALL","SUP","SUB","CODE","ABBR","CITE","S","MARK","TIME","BR","WBR"];' +
           'var el=t;' +
-          'while(el&&el!==document.body&&inlineTags.indexOf(el.tagName)>-1){el=el.parentNode;}' +
-          'if(!el||el===document.body||el===document.documentElement)return t;' +
-          'return el;' +
+          'while(el&&el!==document.body&&inline.indexOf(el.tagName)>-1)el=el.parentNode;' +
+          'return(el&&el!==document.body&&el!==document.documentElement)?el:t;' +
         '}' +
 
-        // Make element absolutely positioned (locks position AND size)
+        // Lock element in place using absolute positioning
         'function makeAbsolute(el){' +
           'if(el.style.position==="absolute")return;' +
-          'var r=el.getBoundingClientRect();' +
-          'var br=document.body.getBoundingClientRect();' +
-          'el.style.position="absolute";' +
-          'el.style.left=(r.left-br.left)+"px";' +
-          'el.style.top=(r.top-br.top)+"px";' +
-          'el.style.width=r.width+"px";' +
-          'el.style.height=r.height+"px";' +
-          'el.style.margin="0";el.style.flexShrink="0";' +
+          'var r=el.getBoundingClientRect(),br=document.body.getBoundingClientRect();' +
+          'el.style.cssText+=";position:absolute;left:"+(r.left-br.left)+"px;top:"+(r.top-br.top)+"px;width:"+r.width+"px;height:"+r.height+"px;margin:0;flex-shrink:0;";' +
         '}' +
 
-        // Overlay: floating selection border with 8 resize handles
+        // Freeze all children of el's parent so flex reflow doesn't shift them
+        'function freezeSiblings(el){' +
+          'var p=el.parentNode;if(!p)return;' +
+          'Array.prototype.forEach.call(p.children,function(c){' +
+            'if(c!==overlay)makeAbsolute(c);' +
+          '});' +
+        '}' +
+
+        // Overlay: the orange border IS the drag handle (pointer-events:all, cursor:move)
+        // Resize handles are children with their own cursors
         'function createOverlay(){' +
           'removeOverlay();' +
           'overlay=document.createElement("div");' +
-          'overlay.style.cssText="position:fixed;pointer-events:none;box-sizing:border-box;border:2px solid #FF6B35;z-index:2147483646;";' +
+          'overlay.style.cssText="position:fixed;box-sizing:border-box;border:2px solid #FF6B35;z-index:2147483646;cursor:move;";' +
           'positionOverlay();' +
+          // Drag via overlay border
+          'overlay.addEventListener("mousedown",function(e){' +
+            'if(e.target!==overlay)return;' +  // handles have their own listener
+            'e.stopPropagation();e.preventDefault();' +
+            'dragActive=true;dragOX=e.clientX;dragOY=e.clientY;dragging=false;freshSel=false;' +
+          '});' +
+          // Build resize handles
           '["nw","n","ne","e","se","s","sw","w"].forEach(function(h){' +
             'var hd=document.createElement("div");' +
             'hd.dataset.handle=h;' +
@@ -653,7 +660,7 @@
                     'e:"top:calc(50% - 5px);right:-5px",se:"bottom:-5px;right:-5px",' +
                     's:"bottom:-5px;left:calc(50% - 5px)",sw:"bottom:-5px;left:-5px",w:"top:calc(50% - 5px);left:-5px"};' +
             'var cur={nw:"nw-resize",n:"n-resize",ne:"ne-resize",e:"e-resize",se:"se-resize",s:"s-resize",sw:"sw-resize",w:"w-resize"};' +
-            'hd.style.cssText="position:absolute;width:10px;height:10px;background:#FF6B35;border:1px solid #fff;box-sizing:border-box;pointer-events:all;z-index:2147483647;border-radius:2px;"+pos[h]+";cursor:"+cur[h]+";";' +
+            'hd.style.cssText="position:absolute;width:10px;height:10px;background:#FF6B35;border:1px solid #fff;box-sizing:border-box;z-index:2147483647;border-radius:2px;"+pos[h]+";cursor:"+cur[h]+";";' +
             'hd.addEventListener("mousedown",onResizeStart);' +
             'overlay.appendChild(hd);' +
           '});' +
@@ -669,22 +676,19 @@
 
         'function selectEl(el){' +
           'if(sel&&sel!==el)exitEdit();' +
-          'sel=el;' +
-          'createOverlay();' +
-          'var fs=getComputedFS(el);' +
-          'var hex=rgbToHex(window.getComputedStyle(el).color);' +
+          'sel=el;createOverlay();' +
+          'var fs=getComputedFS(el),hex=rgbToHex(window.getComputedStyle(el).color);' +
           'window.parent.postMessage({type:"select-text",fontSize:fs,color:hex,tag:el.tagName},"*");' +
         '}' +
-        'function deselect(){' +
-          'exitEdit();removeOverlay();' +
-          'sel=null;' +
-          'window.parent.postMessage({type:"deselect"},"*");' +
-        '}' +
+        'function deselect(){exitEdit();removeOverlay();sel=null;window.parent.postMessage({type:"deselect"},"*");}' +
         'function exitEdit(){' +
-          'if(editing&&sel){sel.removeAttribute("contenteditable");editing=false;window.parent.postMessage({type:"text-commit"},"*");}' +
+          'if(editing&&sel){sel.removeAttribute("contenteditable");editing=false;' +
+            'createOverlay();' + // restore overlay after editing
+            'window.parent.postMessage({type:"text-commit"},"*");}' +
         '}' +
         'function enterEdit(ex,ey){' +
-          'if(!sel)return;' +
+          'if(!sel||editing)return;' +
+          'removeOverlay();' + // hide overlay while editing so user can click freely
           'editing=true;sel.contentEditable="true";sel.focus();' +
           'if(ex!=null&&document.caretRangeFromPoint){' +
             'var rng=document.caretRangeFromPoint(ex,ey);' +
@@ -692,49 +696,47 @@
           '}' +
         '}' +
 
-        // MOUSEDOWN: record what was clicked, set up drag tracking — never enter edit here
+        // Clicks on slide content (not overlay): select element or exit edit
         'document.addEventListener("mousedown",function(e){' +
           'var t=e.target;' +
-          'if(overlay&&overlay.contains(t))return;' // resize handles handle themselves
-          + 'if(t===document.body||t===document.documentElement){deselect();return;}' +
-          // If we're editing and click is inside the editing element, let browser handle cursor
+          'if(overlay&&(t===overlay||overlay.contains(t)))return;' + // handled by overlay/handles
+          'if(t===document.body||t===document.documentElement){deselect();return;}' +
+          // Click inside active edit area → let browser handle cursor
           'if(editing&&sel&&(t===sel||sel.contains(t)))return;' +
-          // Stop current edit if clicking elsewhere
-          'if(editing)exitEdit();' +
-          // Find the block element to operate on
+          // Click outside edit area → exit edit then select clicked element
+          'if(editing){exitEdit();}' +
           'var block=findBlock(t);' +
           'if(!block){deselect();return;}' +
-          // Track for drag
-          'clickedEl=block;dragOX=e.clientX;dragOY=e.clientY;dragging=false;' +
-          // If clicking a different element, select it (freshSel=true = just selected this mousedown)
-          'if(sel!==block){selectEl(block);freshSel=true;}else{freshSel=false;}' +
+          'freshSel=(sel!==block);' +
+          'selectEl(block);' +
           'e.preventDefault();' +
         '});' +
 
-        // MOUSEMOVE: drag to move selected element
+        // MOUSEMOVE: drag selected element (via overlay drag) or resize
         'document.addEventListener("mousemove",function(e){' +
           'if(resizeEl){onResizeMove(e);return;}' +
-          'if(!clickedEl||editing)return;' +
+          'if(!dragActive)return;' +
           'var dx=(e.clientX-dragOX)/getScale(),dy=(e.clientY-dragOY)/getScale();' +
-          'if(!dragging&&(Math.abs(e.clientX-dragOX)+Math.abs(e.clientY-dragOY))>5){'
-            + 'dragging=true;makeAbsolute(clickedEl);' +
+          'if(!dragging&&(Math.abs(e.clientX-dragOX)+Math.abs(e.clientY-dragOY))>4){' +
+            'dragging=true;' +
+            'freezeSiblings(sel);' + // freeze flex siblings BEFORE making el absolute
+            'makeAbsolute(sel);' +
           '}' +
-          'if(dragging){' +
-            'clickedEl.style.left=(parseFloat(clickedEl.style.left)||0)+dx+"px";' +
-            'clickedEl.style.top=(parseFloat(clickedEl.style.top)||0)+dy+"px";' +
+          'if(dragging&&sel){' +
+            'sel.style.left=(parseFloat(sel.style.left)||0)+dx+"px";' +
+            'sel.style.top=(parseFloat(sel.style.top)||0)+dy+"px";' +
             'dragOX=e.clientX;dragOY=e.clientY;positionOverlay();' +
           '}' +
         '});' +
 
-        // MOUSEUP: if no drag occurred and this was a second click on same element → enter edit
+        // MOUSEUP: end drag, or on clean click → enter edit if already selected
         'document.addEventListener("mouseup",function(e){' +
           'if(resizeEl){onResizeEnd();return;}' +
           'var wasDragging=dragging;' +
-          'dragging=false;' +
-          'if(wasDragging){window.parent.postMessage({type:"drag-end"},"*");clickedEl=null;return;}' +
-          // Click (no drag): if element was already selected before this mousedown, enter edit
-          'if(!freshSel&&clickedEl&&sel===clickedEl){enterEdit(e.clientX,e.clientY);}' +
-          'clickedEl=null;' +
+          'dragActive=false;dragging=false;' +
+          'if(wasDragging){window.parent.postMessage({type:"drag-end"},"*");return;}' +
+          // Clean click on overlay (no drag, not freshly selected) → enter edit
+          'if(!freshSel&&sel&&!editing&&e.target===overlay){enterEdit(e.clientX,e.clientY);}' +
         '});' +
 
         // RESIZE
@@ -742,35 +744,32 @@
           'e.stopPropagation();e.preventDefault();' +
           'if(!sel)return;' +
           'resizeEl=sel;resizeHandle=e.target.dataset.handle;' +
-          'makeAbsolute(resizeEl);' +
+          'freezeSiblings(sel);makeAbsolute(sel);' +
           'resizeStartX=e.clientX;resizeStartY=e.clientY;' +
-          'resizeStartRect={l:parseFloat(resizeEl.style.left)||0,t:parseFloat(resizeEl.style.top)||0,' +
-                           'w:parseFloat(resizeEl.style.width)||resizeEl.offsetWidth,' +
-                           'h:parseFloat(resizeEl.style.height)||resizeEl.offsetHeight};' +
+          'resizeStartRect={l:parseFloat(sel.style.left)||0,t:parseFloat(sel.style.top)||0,' +
+                           'w:parseFloat(sel.style.width)||sel.offsetWidth,h:parseFloat(sel.style.height)||sel.offsetHeight};' +
         '}' +
         'function onResizeMove(e){' +
           'if(!resizeEl)return;' +
-          'var sc=getScale();' +
-          'var dx=(e.clientX-resizeStartX)/sc,dy=(e.clientY-resizeStartY)/sc;' +
+          'var sc=getScale(),dx=(e.clientX-resizeStartX)/sc,dy=(e.clientY-resizeStartY)/sc;' +
           'var r=resizeStartRect,nl=r.l,nt=r.t,nw=r.w,nh=r.h,hh=resizeHandle;' +
           'if(hh.indexOf("e")>-1)nw=Math.max(40,r.w+dx);' +
           'if(hh.indexOf("s")>-1)nh=Math.max(20,r.h+dy);' +
           'if(hh.indexOf("w")>-1){nw=Math.max(40,r.w-dx);nl=r.l+r.w-nw;}' +
           'if(hh.indexOf("n")>-1){nh=Math.max(20,r.h-dy);nt=r.t+r.h-nh;}' +
           'resizeEl.style.left=nl+"px";resizeEl.style.top=nt+"px";' +
-          'resizeEl.style.width=nw+"px";resizeEl.style.height=nh+"px";' +
-          'positionOverlay();' +
+          'resizeEl.style.width=nw+"px";resizeEl.style.height=nh+"px";positionOverlay();' +
         '}' +
         'function onResizeEnd(){resizeEl=null;window.parent.postMessage({type:"drag-end"},"*");}' +
 
         'document.addEventListener("dblclick",function(e){' +
-          'if(sel&&!editing){enterEdit(e.clientX,e.clientY);}' +
+          'if(sel&&!editing)enterEdit(e.clientX,e.clientY);' +
         '});' +
         'document.addEventListener("input",function(e){' +
-          'if(e.target.contentEditable==="true"){window.parent.postMessage({type:"text-input"},"*");}' +
+          'if(e.target.contentEditable==="true")window.parent.postMessage({type:"text-input"},"*");' +
         '});' +
         'document.addEventListener("blur",function(e){' +
-          'if(e.target.contentEditable==="true"){window.parent.postMessage({type:"text-commit"},"*");}' +
+          'if(e.target.contentEditable==="true")window.parent.postMessage({type:"text-commit"},"*");' +
         '},true);' +
         'document.addEventListener("keydown",function(e){' +
           'if(e.key==="Escape"){if(editing)exitEdit();else deselect();}' +
