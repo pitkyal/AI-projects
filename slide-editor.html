@@ -896,24 +896,43 @@
   });
 
   function parseImportedHTML(html) {
-    var parser = new DOMParser();
-    var doc = parser.parseFromString(html, 'text/html');
-
-    var sections = Array.from(doc.querySelectorAll('section'));
-    if (sections.length === 0) sections = Array.from(doc.querySelectorAll('div.slide'));
-    if (sections.length === 0) sections = Array.from(doc.querySelectorAll('article'));
-
     var newSlides = [];
 
-    if (sections.length > 0) {
-      sections.forEach(function(sec) {
-        var bg = sec.style.backgroundColor || sec.style.background || '#ffffff';
-        newSlides.push({ html: sec.innerHTML, bg: extractColor(bg) || '#ffffff' });
-      });
-    } else {
-      var bodyHTML = doc.body ? doc.body.innerHTML : html;
-      var bodyBg = doc.body ? (doc.body.style.backgroundColor || '#ffffff') : '#ffffff';
-      newSlides.push({ html: bodyHTML, bg: extractColor(bodyBg) || '#ffffff' });
+    // Handle slides-grab bundled format: sections are inside a JSON-encoded script tag
+    var bundleMatch = html.match(/<script[^>]+type="__bundler\/template"[^>]*>([\s\S]*?)<\/script>/);
+    if (bundleMatch) {
+      try {
+        var inner = JSON.parse(bundleMatch[1].trim());
+        var parser2 = new DOMParser();
+        var innerDoc = parser2.parseFromString(inner, 'text/html');
+        var bundleSections = Array.from(innerDoc.querySelectorAll('section'));
+        if (bundleSections.length > 0) {
+          bundleSections.forEach(function(sec) {
+            var bg = sec.style.backgroundColor || sec.style.background || '#ffffff';
+            newSlides.push({ html: sec.outerHTML, bg: extractColor(bg) || '#ffffff' });
+          });
+        }
+      } catch(e) {}
+    }
+
+    // Standard formats
+    if (newSlides.length === 0) {
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+      var sections = Array.from(doc.querySelectorAll('section'));
+      if (sections.length === 0) sections = Array.from(doc.querySelectorAll('div.slide'));
+      if (sections.length === 0) sections = Array.from(doc.querySelectorAll('article'));
+
+      if (sections.length > 0) {
+        sections.forEach(function(sec) {
+          var bg = sec.style.backgroundColor || sec.style.background || '#ffffff';
+          newSlides.push({ html: sec.outerHTML, bg: extractColor(bg) || '#ffffff' });
+        });
+      } else {
+        var bodyHTML = doc.body ? doc.body.innerHTML : html;
+        var bodyBg = doc.body ? (doc.body.style.backgroundColor || '#ffffff') : '#ffffff';
+        newSlides.push({ html: bodyHTML, bg: extractColor(bodyBg) || '#ffffff' });
+      }
     }
 
     if (newSlides.length > 0) {
