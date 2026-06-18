@@ -608,6 +608,7 @@
       interactiveScript = '<scr' + 'ipt>' +
         '(function(){' +
         'var sel=null,editing=false,dragActive=false,dragOX=0,dragOY=0,dragging=false,freshSel=false;' +
+        'var dragTX=0,dragTY=0;' + // accumulated translate offset for current drag
         'var resizeEl=null,resizeHandle=null,resizeStartX=0,resizeStartY=0,resizeStartRect={};' +
         'var overlay=null;' +
 
@@ -621,48 +622,57 @@
           'var inline=["SPAN","A","STRONG","EM","B","I","U","SMALL","SUP","SUB","CODE","ABBR","CITE","S","MARK","TIME","BR","WBR"];' +
           'var el=t;' +
           'while(el&&el!==document.body&&inline.indexOf(el.tagName)>-1)el=el.parentNode;' +
-          'return(el&&el!==document.body&&el!==document.documentElement)?el:t;' +
+          'return(el&&el!==document.body&&el!==document.documentElement)?el:null;' +
         '}' +
 
-        // Lock element in place using absolute positioning
+        // Get current translate values from element style
+        'function getTranslate(el){' +
+          'var m=(el.style.transform||"").match(/translate\\\\(([^,]+)px,([^)]+)px\\\\)/);' +
+          'return m?{x:parseFloat(m[1]),y:parseFloat(m[2])}:{x:0,y:0};' +
+        '}' +
+        // Move element using CSS transform (never disturbs document flow)
+        'function applyTranslate(el,tx,ty){' +
+          'var base=(el.style.transform||"").replace(/translate\\\\([^)]*\\\\)/g,"").trim();' +
+          'el.style.transform="translate("+tx+"px,"+ty+"px)"+(base?" "+base:"");' +
+        '}' +
+
+        // Lock element absolutely in place (used only for resize)
         'function makeAbsolute(el){' +
           'if(el.style.position==="absolute")return;' +
           'var r=el.getBoundingClientRect(),br=document.body.getBoundingClientRect();' +
-          'el.style.cssText+=";position:absolute;left:"+(r.left-br.left)+"px;top:"+(r.top-br.top)+"px;width:"+r.width+"px;height:"+r.height+"px;margin:0;flex-shrink:0;";' +
+          // absorb any translate offset into left/top so we start clean
+          'el.style.transform=(el.style.transform||"").replace(/translate\\\\([^)]*\\\\)/g,"").trim();' +
+          'el.style.position="absolute";' +
+          'el.style.left=(r.left-br.left)+"px";el.style.top=(r.top-br.top)+"px";' +
+          'el.style.width=r.width+"px";el.style.height=r.height+"px";' +
+          'el.style.margin="0";el.style.flexShrink="0";' +
         '}' +
-
-        // Freeze all children of el's parent so flex reflow doesn't shift them
-        'function freezeSiblings(el){' +
+        // Freeze every sibling in el's parent at their current positions (prevents flex reflow during resize)
+        'function freezeContainer(el){' +
           'var p=el.parentNode;if(!p)return;' +
-          'Array.prototype.forEach.call(p.children,function(c){' +
-            'if(c!==overlay)makeAbsolute(c);' +
-          '});' +
+          'Array.prototype.forEach.call(p.children,function(c){if(c!==overlay)makeAbsolute(c);});' +
         '}' +
 
-        // Overlay: the orange border IS the drag handle (pointer-events:all, cursor:move)
-        // Resize handles are children with their own cursors
+        // Overlay: the orange border IS the drag handle
         'function createOverlay(){' +
           'removeOverlay();' +
           'overlay=document.createElement("div");' +
           'overlay.style.cssText="position:fixed;box-sizing:border-box;border:2px solid #FF6B35;z-index:2147483646;cursor:move;";' +
           'positionOverlay();' +
-          // Drag via overlay border
           'overlay.addEventListener("mousedown",function(e){' +
-            'if(e.target!==overlay)return;' +  // handles have their own listener
+            'if(e.target!==overlay)return;' +
             'e.stopPropagation();e.preventDefault();' +
-            'dragActive=true;dragOX=e.clientX;dragOY=e.clientY;dragging=false;freshSel=false;' +
+            'var t=getTranslate(sel);dragTX=t.x;dragTY=t.y;' +
+            'dragActive=true;dragOX=e.clientX;dragOY=e.clientY;dragging=false;' +
           '});' +
-          // Build resize handles
           '["nw","n","ne","e","se","s","sw","w"].forEach(function(h){' +
-            'var hd=document.createElement("div");' +
-            'hd.dataset.handle=h;' +
+            'var hd=document.createElement("div");hd.dataset.handle=h;' +
             'var pos={nw:"top:-5px;left:-5px",n:"top:-5px;left:calc(50% - 5px)",ne:"top:-5px;right:-5px",' +
                     'e:"top:calc(50% - 5px);right:-5px",se:"bottom:-5px;right:-5px",' +
                     's:"bottom:-5px;left:calc(50% - 5px)",sw:"bottom:-5px;left:-5px",w:"top:calc(50% - 5px);left:-5px"};' +
             'var cur={nw:"nw-resize",n:"n-resize",ne:"ne-resize",e:"e-resize",se:"se-resize",s:"s-resize",sw:"sw-resize",w:"w-resize"};' +
             'hd.style.cssText="position:absolute;width:10px;height:10px;background:#FF6B35;border:1px solid #fff;box-sizing:border-box;z-index:2147483647;border-radius:2px;"+pos[h]+";cursor:"+cur[h]+";";' +
-            'hd.addEventListener("mousedown",onResizeStart);' +
-            'overlay.appendChild(hd);' +
+            'hd.addEventListener("mousedown",onResizeStart);overlay.appendChild(hd);' +
           '});' +
           'document.body.appendChild(overlay);' +
         '}' +
@@ -682,69 +692,64 @@
         '}' +
         'function deselect(){exitEdit();removeOverlay();sel=null;window.parent.postMessage({type:"deselect"},"*");}' +
         'function exitEdit(){' +
-          'if(editing&&sel){sel.removeAttribute("contenteditable");editing=false;' +
-            'createOverlay();' + // restore overlay after editing
-            'window.parent.postMessage({type:"text-commit"},"*");}' +
+          'if(editing&&sel){sel.removeAttribute("contenteditable");editing=false;createOverlay();window.parent.postMessage({type:"text-commit"},"*");}' +
         '}' +
         'function enterEdit(ex,ey){' +
           'if(!sel||editing)return;' +
-          'removeOverlay();' + // hide overlay while editing so user can click freely
-          'editing=true;sel.contentEditable="true";sel.focus();' +
+          'removeOverlay();editing=true;sel.contentEditable="true";sel.focus();' +
           'if(ex!=null&&document.caretRangeFromPoint){' +
             'var rng=document.caretRangeFromPoint(ex,ey);' +
             'if(rng){var s=window.getSelection();s.removeAllRanges();s.addRange(rng);}' +
           '}' +
         '}' +
 
-        // Clicks on slide content (not overlay): select element or exit edit
+        // Click on slide content (not overlay): select the clicked element
         'document.addEventListener("mousedown",function(e){' +
           'var t=e.target;' +
-          'if(overlay&&(t===overlay||overlay.contains(t)))return;' + // handled by overlay/handles
+          'if(overlay&&(t===overlay||overlay.contains(t)))return;' +
           'if(t===document.body||t===document.documentElement){deselect();return;}' +
-          // Click inside active edit area → let browser handle cursor
           'if(editing&&sel&&(t===sel||sel.contains(t)))return;' +
-          // Click outside edit area → exit edit then select clicked element
-          'if(editing){exitEdit();}' +
-          'var block=findBlock(t);' +
-          'if(!block){deselect();return;}' +
-          'freshSel=(sel!==block);' +
-          'selectEl(block);' +
-          'e.preventDefault();' +
+          'if(editing)exitEdit();' +
+          'var block=findBlock(t);if(!block){deselect();return;}' +
+          'freshSel=(sel!==block);selectEl(block);e.preventDefault();' +
         '});' +
 
-        // MOUSEMOVE: drag selected element (via overlay drag) or resize
+        // MOUSEMOVE: translate for drag (never touches layout), resize uses absolute
         'document.addEventListener("mousemove",function(e){' +
           'if(resizeEl){onResizeMove(e);return;}' +
-          'if(!dragActive)return;' +
+          'if(!dragActive||!sel)return;' +
           'var dx=(e.clientX-dragOX)/getScale(),dy=(e.clientY-dragOY)/getScale();' +
-          'if(!dragging&&(Math.abs(e.clientX-dragOX)+Math.abs(e.clientY-dragOY))>4){' +
-            'dragging=true;' +
-            'freezeSiblings(sel);' + // freeze flex siblings BEFORE making el absolute
-            'makeAbsolute(sel);' +
-          '}' +
-          'if(dragging&&sel){' +
-            'sel.style.left=(parseFloat(sel.style.left)||0)+dx+"px";' +
-            'sel.style.top=(parseFloat(sel.style.top)||0)+dy+"px";' +
+          'if(!dragging&&(Math.abs(e.clientX-dragOX)+Math.abs(e.clientY-dragOY))>4)dragging=true;' +
+          'if(dragging){' +
+            'dragTX+=dx;dragTY+=dy;' +
+            'applyTranslate(sel,dragTX,dragTY);' +
             'dragOX=e.clientX;dragOY=e.clientY;positionOverlay();' +
           '}' +
         '});' +
 
-        // MOUSEUP: end drag, or on clean click → enter edit if already selected
+        // MOUSEUP: end drag; or on clean click → enter edit / select inner element
         'document.addEventListener("mouseup",function(e){' +
           'if(resizeEl){onResizeEnd();return;}' +
           'var wasDragging=dragging;' +
           'dragActive=false;dragging=false;' +
           'if(wasDragging){window.parent.postMessage({type:"drag-end"},"*");return;}' +
-          // Clean click on overlay (no drag, not freshly selected) → enter edit
-          'if(!freshSel&&sel&&!editing&&e.target===overlay){enterEdit(e.clientX,e.clientY);}' +
+          // Clean click on overlay: check what element is actually underneath
+          'if(e.target===overlay&&!freshSel&&sel&&!editing){' +
+            'overlay.style.pointerEvents="none";' +
+            'var below=document.elementFromPoint(e.clientX,e.clientY);' +
+            'overlay.style.pointerEvents="";' +
+            'var inner=below?findBlock(below):null;' +
+            // If a different inner element is found → select it; else → enter edit
+            'if(inner&&inner!==sel&&sel.contains(inner)){selectEl(inner);freshSel=true;}' +
+            'else{enterEdit(e.clientX,e.clientY);}' +
+          '}' +
         '});' +
 
-        // RESIZE
+        // RESIZE: uses makeAbsolute + freezeContainer (only on explicit resize action)
         'function onResizeStart(e){' +
-          'e.stopPropagation();e.preventDefault();' +
-          'if(!sel)return;' +
+          'e.stopPropagation();e.preventDefault();if(!sel)return;' +
+          'freezeContainer(sel);makeAbsolute(sel);' +
           'resizeEl=sel;resizeHandle=e.target.dataset.handle;' +
-          'freezeSiblings(sel);makeAbsolute(sel);' +
           'resizeStartX=e.clientX;resizeStartY=e.clientY;' +
           'resizeStartRect={l:parseFloat(sel.style.left)||0,t:parseFloat(sel.style.top)||0,' +
                            'w:parseFloat(sel.style.width)||sel.offsetWidth,h:parseFloat(sel.style.height)||sel.offsetHeight};' +
@@ -762,15 +767,9 @@
         '}' +
         'function onResizeEnd(){resizeEl=null;window.parent.postMessage({type:"drag-end"},"*");}' +
 
-        'document.addEventListener("dblclick",function(e){' +
-          'if(sel&&!editing)enterEdit(e.clientX,e.clientY);' +
-        '});' +
-        'document.addEventListener("input",function(e){' +
-          'if(e.target.contentEditable==="true")window.parent.postMessage({type:"text-input"},"*");' +
-        '});' +
-        'document.addEventListener("blur",function(e){' +
-          'if(e.target.contentEditable==="true")window.parent.postMessage({type:"text-commit"},"*");' +
-        '},true);' +
+        'document.addEventListener("dblclick",function(e){if(sel&&!editing)enterEdit(e.clientX,e.clientY);});' +
+        'document.addEventListener("input",function(e){if(e.target.contentEditable==="true")window.parent.postMessage({type:"text-input"},"*");});' +
+        'document.addEventListener("blur",function(e){if(e.target.contentEditable==="true")window.parent.postMessage({type:"text-commit"},"*");},true);' +
         'document.addEventListener("keydown",function(e){' +
           'if(e.key==="Escape"){if(editing)exitEdit();else deselect();}' +
           'if((e.ctrlKey||e.metaKey)&&e.key==="z"){e.preventDefault();window.parent.postMessage({type:"undo-request"},"*");}' +
@@ -783,7 +782,9 @@
     var bStyle = bodyStyle ? bodyStyle : '';
     return '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
       extraHead +
-      '<style>*{box-sizing:border-box;margin:0;padding:0;}html{width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;}body{position:relative;width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;background:' + (bg || '#ffffff') + ';' + bStyle + '}[contenteditable]:focus{outline:2px solid #FF6B35!important;}</style>' +
+      '<style>*{box-sizing:border-box;margin:0;padding:0;}' +
+      (interactive?'body *{pointer-events:auto!important;}':'') +
+      'html{width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;}body{position:relative;width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;overflow:hidden;background:' + (bg || '#ffffff') + ';' + bStyle + '}[contenteditable]:focus{outline:2px solid #FF6B35!important;}</style>' +
       '</head><body>' + html + interactiveScript + '</body></html>';
   }
 
