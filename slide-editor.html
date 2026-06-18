@@ -475,17 +475,19 @@
   var replaceImgBtn  = document.getElementById('replace-img-btn');
   var deleteImgBtn   = document.getElementById('delete-img-btn');
 
+  var currentScale = 1;
+
   // RESIZE PREVIEW
   function resizePreview() {
     var main = document.getElementById('main');
     var availW = main.clientWidth - 48;
     var availH = main.clientHeight - 80;
-    var scale = Math.min(availW / SLIDE_W, availH / SLIDE_H);
-    var w = Math.round(SLIDE_W * scale);
-    var h = Math.round(SLIDE_H * scale);
+    currentScale = Math.min(availW / SLIDE_W, availH / SLIDE_H);
+    var w = Math.round(SLIDE_W * currentScale);
+    var h = Math.round(SLIDE_H * currentScale);
     previewIframe.style.width  = SLIDE_W + 'px';
     previewIframe.style.height = SLIDE_H + 'px';
-    previewIframe.style.transform = 'scale(' + scale + ')';
+    previewIframe.style.transform = 'scale(' + currentScale + ')';
     previewIframe.style.transformOrigin = 'top left';
     previewWrapper.style.width  = w + 'px';
     previewWrapper.style.height = h + 'px';
@@ -584,6 +586,14 @@
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
   });
 
+  // Inject current scale into iframe so drag deltas are correct
+  function injectScaleToIframe() {
+    try {
+      previewIframe.contentWindow.__editorScale = currentScale;
+    } catch(e) {}
+  }
+  previewIframe.addEventListener('load', injectScaleToIframe);
+
   // RENDER PREVIEW
   function renderPreview() {
     if (currentIndex < 0 || currentIndex >= slides.length) return;
@@ -597,15 +607,18 @@
     if (interactive) {
       interactiveScript = '<scr' + 'ipt>' +
         '(function(){' +
-        'var selectedEl=null,dragging=false,dragEl=null,dragOX=0,dragOY=0;' +
+        // scale factor injected from parent so drag deltas are correct
+        'var SCALE=' + 'window.__editorScale||1;' +
+        'var selectedEl=null,dragging=false,dragEl=null,dragOX=0,dragOY=0,dragStartLeft=0,dragStartTop=0;' +
         'function getComputedFS(el){return parseInt(window.getComputedStyle(el).fontSize)||16;}' +
         'function rgbToHex(rgb){var m=rgb.match(/rgb\\\\((\\\\d+),\\\\s*(\\\\d+),\\\\s*(\\\\d+)\\\\)/);if(!m)return"#000000";return"#"+[m[1],m[2],m[3]].map(function(x){return parseInt(x).toString(16).padStart(2,"0");}).join("");}' +
         'function makeAbsolute(el){' +
           'if(el.style.position==="absolute")return;' +
           'var r=el.getBoundingClientRect();' +
+          'var br=document.body.getBoundingClientRect();' +
           'el.style.position="absolute";' +
-          'el.style.left=r.left+"px";' +
-          'el.style.top=r.top+"px";' +
+          'el.style.left=(r.left-br.left)+"px";' +
+          'el.style.top=(r.top-br.top)+"px";' +
           'el.style.width=r.width+"px";' +
           'el.style.margin="0";' +
         '}' +
@@ -623,35 +636,46 @@
           'selectedEl=null;' +
           'window.parent.postMessage({type:"deselect"},"*");' +
         '}' +
-        // MOUSEDOWN — start drag or select
+        // MOUSEDOWN
         'document.addEventListener("mousedown",function(e){' +
-          'var t=e.target;' +
-          'if(t===document.body)return;' +
+          'var t=e.target;if(t===document.body||t===document.documentElement)return;' +
+          'if(t.contentEditable==="true")return;' + // don't interfere with active text edit
           'selectEl(t);' +
           'dragEl=t;dragOX=e.clientX;dragOY=e.clientY;dragging=false;' +
           'e.preventDefault();' +
         '});' +
-        // MOUSEMOVE — drag
+        // MOUSEMOVE — divide delta by scale so 1 physical px = 1 slide px
         'document.addEventListener("mousemove",function(e){' +
           'if(!dragEl)return;' +
-          'var dx=e.clientX-dragOX,dy=e.clientY-dragOY;' +
-          'if(!dragging&&Math.abs(dx)+Math.abs(dy)>4){dragging=true;makeAbsolute(dragEl);}' +
+          'var scale=window.__editorScale||1;' +
+          'var dx=(e.clientX-dragOX)/scale,dy=(e.clientY-dragOY)/scale;' +
+          'if(!dragging&&(Math.abs(e.clientX-dragOX)+Math.abs(e.clientY-dragOY))>4){' +
+            'dragging=true;makeAbsolute(dragEl);' +
+            'dragStartLeft=parseFloat(dragEl.style.left)||0;' +
+            'dragStartTop=parseFloat(dragEl.style.top)||0;' +
+          '}' +
           'if(dragging){' +
             'dragEl.style.left=(parseFloat(dragEl.style.left)||0)+dx+"px";' +
             'dragEl.style.top=(parseFloat(dragEl.style.top)||0)+dy+"px";' +
             'dragOX=e.clientX;dragOY=e.clientY;' +
           '}' +
         '});' +
-        // MOUSEUP — finish drag or treat as click
+        // MOUSEUP
         'document.addEventListener("mouseup",function(e){' +
           'if(!dragEl)return;' +
           'if(!dragging){' +
-            // it was a click — enable text editing for text elements
             'var textTags=["P","H1","H2","H3","H4","H5","H6","SPAN","A","LI","TD","TH","LABEL","FIGCAPTION","STRONG","EM","B","I","U","DIV"];' +
             'if(textTags.indexOf(dragEl.tagName)>-1){' +
               'dragEl.contentEditable="true";' +
               'dragEl.style.cursor="text";' +
-              'dragEl.focus();' +
+              // place cursor at click position, not beginning
+              '(function(){' +
+                'var range;' +
+                'if(document.caretRangeFromPoint){range=document.caretRangeFromPoint(e.clientX,e.clientY);}' +
+                'else if(document.caretPositionFromPoint){var p=document.caretPositionFromPoint(e.clientX,e.clientY);if(p){range=document.createRange();range.setStart(p.offsetNode,p.offset);range.collapse(true);}}' +
+                'dragEl.focus();' +
+                'if(range){var sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);}' +
+              '})();' +
               'var fs=getComputedFS(dragEl);' +
               'var hex=rgbToHex(window.getComputedStyle(dragEl).color);' +
               'window.parent.postMessage({type:"select-text",fontSize:fs,color:hex,tag:dragEl.tagName},"*");' +
@@ -671,8 +695,10 @@
         'document.addEventListener("blur",function(e){' +
           'if(e.target.contentEditable==="true"){window.parent.postMessage({type:"text-commit"},"*");}' +
         '},true);' +
+        // Forward Ctrl+Z to parent (iframe captures keyboard when focused)
         'document.addEventListener("keydown",function(e){' +
           'if(e.key==="Escape"){deselect();}' +
+          'if((e.ctrlKey||e.metaKey)&&e.key==="z"){e.preventDefault();window.parent.postMessage({type:"undo-request"},"*");}' +
         '});' +
         '})();' +
         '<\/scr' + 'ipt>';
@@ -708,8 +734,10 @@
       saveContent(false);
       refreshThumb(currentIndex);
     } else if (msg.type === 'text-commit') {
-      saveContent(true); // push undo when done editing
+      saveContent(true);
       refreshThumb(currentIndex);
+    } else if (msg.type === 'undo-request') {
+      undo();
     }
   });
 
