@@ -449,8 +449,8 @@
   var slides = [];
   var currentIndex = -1;
 
-  var SLIDE_W = 960;
-  var SLIDE_H = 540;
+  var SLIDE_W = 1200;
+  var SLIDE_H = 800;
 
   // DOM REFS
   var slidesList     = document.getElementById('slides-list');
@@ -903,6 +903,29 @@
     if (bundleMatch) {
       try {
         var inner = JSON.parse(bundleMatch[1].trim());
+
+        // Build image map from manifest (UUID -> data URI)
+        var imgMap = {};
+        var manifestMatch = html.match(/<script[^>]+type="__bundler\/manifest"[^>]*>([\s\S]*?)<\/script>/);
+        if (manifestMatch) {
+          try {
+            var manifest = JSON.parse(manifestMatch[1].trim());
+            Object.keys(manifest).forEach(function(uuid) {
+              var entry = manifest[uuid];
+              if (entry.mime && entry.mime.startsWith('image') && entry.data) {
+                imgMap[uuid] = 'data:' + entry.mime + ';base64,' + entry.data;
+              }
+            });
+          } catch(e2) {}
+        }
+
+        // Replace UUID src references with data URIs
+        Object.keys(imgMap).forEach(function(uuid) {
+          inner = inner.split('src="' + uuid + '"').join('src="' + imgMap[uuid] + '"');
+          inner = inner.split("src='" + uuid + "'").join("src='" + imgMap[uuid] + "'");
+          inner = inner.split('url("' + uuid + '")').join('url("' + imgMap[uuid] + '")');
+        });
+
         var parser2 = new DOMParser();
         var innerDoc = parser2.parseFromString(inner, 'text/html');
         var bundleSections = Array.from(innerDoc.querySelectorAll('section'));
@@ -998,7 +1021,7 @@
 '  <script>\n' +
 '    var SLIDES = ' + slidesJSON + ';\n' +
 '    var current = 0;\n' +
-'    var SLIDE_W = 960, SLIDE_H = 540;\n' +
+'    var SLIDE_W = 1200, SLIDE_H = 800;\n' +
 '    function buildDoc(slide) {\n' +
 '      return "<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><style>*{box-sizing:border-box;margin:0;padding:0;}html,body{width:"+SLIDE_W+"px;height:"+SLIDE_H+"px;overflow:hidden;background:"+slide.bg+";}body{font-family:sans-serif;}section{width:"+SLIDE_W+"px!important;height:"+SLIDE_H+"px!important;}</style></head><body>"+slide.html+"</body></html>";\n' +
 '    }\n' +
