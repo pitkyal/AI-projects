@@ -659,14 +659,12 @@
           'el.style.width=r.width+"px";el.style.height=r.height+"px";' +
           'el.style.margin="0";el.style.flexShrink="0";' +
         '}' +
-        // Freeze ALL elements in the slide body at their current visual positions
+        // Freeze only direct body children — these are the flex items that reflow on delete
         'function freezeAll(){' +
-          'var all=document.body.querySelectorAll("*");' +
-          'for(var i=all.length-1;i>=0;i--){' +
-            'var c=all[i];' +
-            'if(c===overlay||c.getAttribute("data-editor-ui"))continue;' +
-            'if(c.nodeType===1)makeAbsolute(c);' +
-          '}' +
+          'Array.prototype.forEach.call(document.body.children,function(c){' +
+            'if(c===overlay||c.getAttribute("data-editor-ui"))return;' +
+            'makeAbsolute(c);' +
+          '});' +
         '}' +
         // Freeze every sibling in el's parent at their current positions (for resize)
         'function freezeContainer(el){' +
