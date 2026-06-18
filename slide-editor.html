@@ -770,22 +770,11 @@
         'document.addEventListener("input",function(e){' +
           'if(e.target.contentEditable==="true"){window.parent.postMessage({type:"text-input"},"*");}' +
         '});' +
-        'document.addEventListener("keydown",function(e){' +
-          'if(e.key==="Escape"){if(editing)exitEdit();else deselect();}' +
-          'if((e.ctrlKey||e.metaKey)&&e.key==="z"){e.preventDefault();window.parent.postMessage({type:"undo-request"},"*");}' +
-        '});' +
-        '})();'
-          'dragEl=null;dragging=false;' +
-        '});' +
-        'document.addEventListener("input",function(e){' +
-          'if(e.target.contentEditable==="true"){window.parent.postMessage({type:"text-input"},"*");}' +
-        '});' +
         'document.addEventListener("blur",function(e){' +
           'if(e.target.contentEditable==="true"){window.parent.postMessage({type:"text-commit"},"*");}' +
         '},true);' +
-        // Forward Ctrl+Z to parent (iframe captures keyboard when focused)
         'document.addEventListener("keydown",function(e){' +
-          'if(e.key==="Escape"){deselect();}' +
+          'if(e.key==="Escape"){if(editing)exitEdit();else deselect();}' +
           'if((e.ctrlKey||e.metaKey)&&e.key==="z"){e.preventDefault();window.parent.postMessage({type:"undo-request"},"*");}' +
         '});' +
         '})();' +
