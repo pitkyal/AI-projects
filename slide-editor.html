@@ -449,8 +449,8 @@
   var slides = [];
   var currentIndex = -1;
 
-  var SLIDE_W = 1200;
-  var SLIDE_H = 800;
+  var SLIDE_W = 1920;
+  var SLIDE_H = 1080;
 
   // DOM REFS
   var slidesList     = document.getElementById('slides-list');
@@ -1020,7 +1020,7 @@
 '  <script>\n' +
 '    var SLIDES = ' + slidesJSON + ';\n' +
 '    var current = 0;\n' +
-'    var SLIDE_W = 1200, SLIDE_H = 800;\n' +
+'    var SLIDE_W = 1920, SLIDE_H = 1080;\n' +
 '    function buildDoc(slide) {\n' +
 '      var bStyle = slide.bodyStyle || ""; var hExtra = slide.headExtra || ""; return "<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\">"+hExtra+"<style>*{box-sizing:border-box;margin:0;padding:0;}html,body{width:"+SLIDE_W+"px;height:"+SLIDE_H+"px;overflow:hidden;background:"+slide.bg+";}body{"+bStyle+"}</style></head><body>"+slide.html+"</body></html>";\n' +
 '    }\n' +
